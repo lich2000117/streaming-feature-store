@@ -1,0 +1,6 @@
+# Schema validation and serialization
+avro-python3==1.10.2
+confluent-kafka[avro]==2.0.2
+
+# JSON schema validation (optional)
+jsonschema==4.17.3

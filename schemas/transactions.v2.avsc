@@ -1,0 +1,133 @@
+{
+  "type": "record",
+  "name": "Transaction",
+  "namespace": "com.streamingfs.events",
+  "doc": "Payment transaction event for fraud detection (v2 with merchant enrichment)",
+  "fields": [
+    {
+      "name": "txn_id",
+      "type": "string",
+      "doc": "Unique transaction identifier"
+    },
+    {
+      "name": "card_id", 
+      "type": "string",
+      "doc": "Payment card identifier (partition key for fraud locality)"
+    },
+    {
+      "name": "user_id",
+      "type": "string", 
+      "doc": "User identifier for cross-entity features"
+    },
+    {
+      "name": "amount",
+      "type": "double",
+      "doc": "Transaction amount in base currency units"
+    },
+    {
+      "name": "currency",
+      "type": {
+        "type": "enum",
+        "name": "Currency",
+        "symbols": ["USD", "EUR", "GBP", "CAD", "AUD", "JPY", "CHF"]
+      },
+      "default": "USD",
+      "doc": "Transaction currency code (v2: added JPY, CHF)"
+    },
+    {
+      "name": "mcc",
+      "type": "string",
+      "doc": "Merchant category code (4-digit) - DEPRECATED: use merchant_category"
+    },
+    {
+      "name": "merchant_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "v2: Merchant identifier for merchant-based features"
+    },
+    {
+      "name": "merchant_name",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "v2: Merchant business name"
+    },
+    {
+      "name": "merchant_category",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "v2: Human-readable merchant category"
+    },
+    {
+      "name": "device_id",
+      "type": "string",
+      "doc": "Device fingerprint for cross-stream joins"
+    },
+    {
+      "name": "ip_address", 
+      "type": "string",
+      "doc": "Client IP address for geo analysis"
+    },
+    {
+      "name": "geo_country",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Country code derived from IP (optional)"
+    },
+    {
+      "name": "geo_city",
+      "type": ["null", "string"], 
+      "default": null,
+      "doc": "City derived from IP (optional)"
+    },
+    {
+      "name": "geo_lat",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Latitude coordinate (optional)"
+    },
+    {
+      "name": "geo_lon", 
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Longitude coordinate (optional)"
+    },
+    {
+      "name": "risk_score",
+      "type": "double",
+      "default": 0.0,
+      "doc": "v2: Preliminary risk score from upstream systems"
+    },
+    {
+      "name": "payment_method",
+      "type": {
+        "type": "enum",
+        "name": "PaymentMethod",
+        "symbols": ["CARD_PRESENT", "CARD_NOT_PRESENT", "CONTACTLESS", "MOBILE_WALLET", "BANK_TRANSFER"]
+      },
+      "default": "CARD_NOT_PRESENT",
+      "doc": "v2: Payment method type for contextual features"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "Event timestamp in milliseconds since epoch"
+    },
+    {
+      "name": "processing_time",
+      "type": ["null", "long"],
+      "logicalType": "timestamp-millis", 
+      "default": null,
+      "doc": "System processing timestamp (set by producer)"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional metadata as key-value pairs"
+    }
+  ]
+}

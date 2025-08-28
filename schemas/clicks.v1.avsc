@@ -1,0 +1,124 @@
+{
+  "type": "record",
+  "name": "ClickEvent",
+  "namespace": "com.streamingfs.events",
+  "doc": "User clickstream event for personalization features",
+  "fields": [
+    {
+      "name": "event_id",
+      "type": "string",
+      "doc": "Unique event identifier"
+    },
+    {
+      "name": "user_id",
+      "type": "string",
+      "doc": "User identifier (partition key for personalization locality)"
+    },
+    {
+      "name": "session_id", 
+      "type": "string",
+      "doc": "User session identifier for session-based features"
+    },
+    {
+      "name": "page_url",
+      "type": "string",
+      "doc": "Current page URL"
+    },
+    {
+      "name": "page_type",
+      "type": {
+        "type": "enum",
+        "name": "PageType", 
+        "symbols": ["HOME", "PRODUCT", "CATEGORY", "CART", "CHECKOUT", "PROFILE", "OTHER"]
+      },
+      "default": "OTHER",
+      "doc": "Page category for feature engineering"
+    },
+    {
+      "name": "item_id",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Product/item identifier if applicable"
+    },
+    {
+      "name": "category_id",
+      "type": ["null", "string"], 
+      "default": null,
+      "doc": "Product category if applicable"
+    },
+    {
+      "name": "action_type",
+      "type": {
+        "type": "enum",
+        "name": "ActionType",
+        "symbols": ["VIEW", "CLICK", "ADD_TO_CART", "REMOVE_FROM_CART", "PURCHASE", "SEARCH"]
+      },
+      "doc": "User action performed"
+    },
+    {
+      "name": "referrer_url",
+      "type": ["null", "string"],
+      "default": null, 
+      "doc": "Previous page URL"
+    },
+    {
+      "name": "device_id",
+      "type": "string",
+      "doc": "Device fingerprint for cross-stream joins"
+    },
+    {
+      "name": "user_agent",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Browser user agent string"
+    },
+    {
+      "name": "ip_address",
+      "type": "string", 
+      "doc": "Client IP address"
+    },
+    {
+      "name": "dwell_time_ms",
+      "type": ["null", "long"],
+      "default": null,
+      "doc": "Time spent on previous page in milliseconds"
+    },
+    {
+      "name": "scroll_depth",
+      "type": ["null", "double"],
+      "default": null,
+      "doc": "Scroll depth percentage (0.0 - 1.0)"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "Event timestamp in milliseconds since epoch"
+    },
+    {
+      "name": "processing_time",
+      "type": ["null", "long"],
+      "logicalType": "timestamp-millis",
+      "default": null,
+      "doc": "System processing timestamp"
+    },
+    {
+      "name": "experiment_ids",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "A/B test experiment identifiers"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map", 
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional metadata as key-value pairs"
+    }
+  ]
+}

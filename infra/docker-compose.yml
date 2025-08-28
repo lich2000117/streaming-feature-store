@@ -1,0 +1,37 @@
+services:
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.1.4
+    command: ["redpanda","start","--overprovisioned","--smp","1","--memory","1G","--reserve-memory","0M","--node-id","0","--check=false"]
+    ports: [ "9092:9092", "9644:9644" ]
+  schema-registry:
+    image: confluentinc/cp-schema-registry:7.7.0
+    environment:
+      SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: PLAINTEXT://redpanda:9092
+      SCHEMA_REGISTRY_HOST_NAME: schema-registry
+      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+    ports: [ "8081:8081" ]
+    depends_on: [ redpanda ]
+  redis:
+    image: redis:7-alpine
+    ports: [ "6379:6379" ]
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.16.0
+    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlartifacts
+    volumes: [ "./infra/mlartifacts:/mlartifacts" ]
+    ports: [ "5000:5000" ]
+  grafana:
+    image: grafana/grafana:11.1.0
+    ports: [ "3000:3000" ]
+  prometheus:
+    image: prom/prometheus:v2.53.1
+    ports: [ "9090:9090" ]
+  flink-jobmanager:
+    image: flink:1.19
+    command: jobmanager
+    ports: ["8083:8081"]
+    environment: [ "JOB_MANAGER_RPC_ADDRESS=flink-jobmanager" ]
+  flink-taskmanager:
+    image: flink:1.19
+    command: taskmanager
+    depends_on: [ flink-jobmanager ]
+    environment: [ "JOB_MANAGER_RPC_ADDRESS=flink-jobmanager" ]

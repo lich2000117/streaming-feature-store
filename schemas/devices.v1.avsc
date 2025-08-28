@@ -1,0 +1,146 @@
+{
+  "type": "record",
+  "name": "DeviceEvent",
+  "namespace": "com.streamingfs.events", 
+  "doc": "Device fingerprint enrichment data for fraud detection",
+  "fields": [
+    {
+      "name": "device_id",
+      "type": "string",
+      "doc": "Unique device fingerprint identifier (partition key)"
+    },
+    {
+      "name": "fingerprint_hash",
+      "type": "string",
+      "doc": "Device fingerprint hash for uniqueness"
+    },
+    {
+      "name": "user_agent",
+      "type": "string",
+      "doc": "Full user agent string"
+    },
+    {
+      "name": "browser",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Parsed browser name and version"
+    },
+    {
+      "name": "os",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Operating system name and version"
+    },
+    {
+      "name": "device_type",
+      "type": {
+        "type": "enum",
+        "name": "DeviceType",
+        "symbols": ["DESKTOP", "MOBILE", "TABLET", "BOT", "UNKNOWN"]
+      },
+      "default": "UNKNOWN",
+      "doc": "Device category"
+    },
+    {
+      "name": "screen_resolution",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Screen resolution (e.g., '1920x1080')"
+    },
+    {
+      "name": "timezone",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Device timezone (e.g., 'America/New_York')"
+    },
+    {
+      "name": "language",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Browser language preference"
+    },
+    {
+      "name": "plugins",
+      "type": {
+        "type": "array",
+        "items": "string"
+      },
+      "default": [],
+      "doc": "List of installed browser plugins"
+    },
+    {
+      "name": "ip_address",
+      "type": "string",
+      "doc": "IP address when fingerprint was captured"
+    },
+    {
+      "name": "geo_country",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Country derived from IP"
+    },
+    {
+      "name": "geo_region",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Region/state derived from IP"
+    },
+    {
+      "name": "isp",
+      "type": ["null", "string"],
+      "default": null,
+      "doc": "Internet service provider"
+    },
+    {
+      "name": "is_proxy",
+      "type": "boolean",
+      "default": false,
+      "doc": "Whether IP appears to be a proxy/VPN"
+    },
+    {
+      "name": "is_tor",
+      "type": "boolean", 
+      "default": false,
+      "doc": "Whether IP is a known Tor exit node"
+    },
+    {
+      "name": "risk_score",
+      "type": "double",
+      "default": 0.0,
+      "doc": "Device risk score (0.0 = low risk, 1.0 = high risk)"
+    },
+    {
+      "name": "first_seen",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "First time this device was seen"
+    },
+    {
+      "name": "last_seen",
+      "type": "long", 
+      "logicalType": "timestamp-millis",
+      "doc": "Most recent activity from this device"
+    },
+    {
+      "name": "total_events",
+      "type": "long",
+      "default": 1,
+      "doc": "Total number of events from this device"
+    },
+    {
+      "name": "timestamp",
+      "type": "long",
+      "logicalType": "timestamp-millis",
+      "doc": "Event timestamp in milliseconds since epoch"
+    },
+    {
+      "name": "metadata",
+      "type": {
+        "type": "map",
+        "values": "string"
+      },
+      "default": {},
+      "doc": "Additional device attributes"
+    }
+  ]
+}

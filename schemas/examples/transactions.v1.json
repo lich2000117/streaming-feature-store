@@ -1,0 +1,17 @@
+{
+  "txn_id": "ebec889a",
+  "card_id": "ccf48125",
+  "user_id": "3c26bb54",
+  "amount": 129.99,
+  "currency": "USD",
+  "mcc": "example_mcc",
+  "device_id": "ffeea138",
+  "ip_address": "192.168.1.100",
+  "geo_country": null,
+  "geo_city": null,
+  "geo_lat": null,
+  "geo_lon": null,
+  "timestamp": 1756355338640,
+  "processing_time": null,
+  "metadata": {}
+}
