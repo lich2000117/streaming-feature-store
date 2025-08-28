@@ -1,0 +1,57 @@
+.venv/
+*.pyc
+# Python
+**/__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+dist/
+build/
+.eggs/
+*.log
+
+# Virtual environments
+.venv/
+env/
+venv/
+ENV/
+*.env
+*.venv
+
+# Jupyter
+.ipynb_checkpoints
+
+# IDEs/editors
+.vscode/
+.idea/
+*.sublime-workspace
+*.sublime-project
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Kafka/streaming
+# Ignore local Kafka data directories (if any)
+kafka-logs/
+zookeeper-logs/
+tmp/
+logs/
+
+# Avro schema registry cache (if used)
+schema_registry_local/
+
+# Test & coverage
+.coverage
+htmlcov/
+.tox/
+.nox/
+pytest_cache/
+.cache/
+
+# Misc
+*.bak
+*.swp
+*.tmp
