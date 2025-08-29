@@ -1,0 +1,27 @@
+# Apache Flink for stream processing
+apache-flink==1.19.1
+
+# Kafka connectors
+apache-flink-libraries==1.19.1
+
+# Redis client for feature store
+redis==5.2.0
+
+# Data processing
+pandas==2.1.4
+numpy>=1.26.0,<2.0
+
+# Serialization
+avro-python3==1.10.2
+fastavro==1.10.0
+
+# Configuration and utilities
+pydantic==2.5.2
+python-dotenv==1.0.0
+click==8.1.7
+
+# Monitoring and metrics
+prometheus-client==0.21.0
+
+# Logging
+structlog==24.1.0

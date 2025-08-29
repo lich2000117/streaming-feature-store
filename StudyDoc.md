@@ -517,6 +517,180 @@ class MockKafkaProducer:
 4. **Explore state management** (how Flink handles stateful processing)
 5. **Study backpressure** (what happens when consumers can't keep up)
 
+---
+
+# 📊 Chapter 3: Stream Processing & Feature Engineering
+## From Raw Events to ML-Ready Features
+
+---
+
+## 🎯 **Two Approaches: Production vs Development**
+
+### **Production: Flink Job (`jobs/feature_job.py`)**
+```python
+# Full PyFlink with exactly-once semantics
+transaction_stream = env.from_source(kafka_source, watermark_strategy)
+features = transaction_stream.process(TransactionFeatureProcessor())
+features.map(RedisFeatureSink()).execute()
+```
+
+### **Development: Simplified Processor (`stream_processor.py`)**
+```python
+# Pure Python for rapid iteration
+consumer = KafkaConsumer('txn.events')
+for message in consumer:
+    features = tx_computer.process_event(message.value)
+    redis_client.set(feature_key, features)
+```
+
+---
+
+## ⚡ **Key Streaming Concepts**
+
+### **1. Event-Time Processing**
+```python
+# Events arrive out-of-order, but we process by event timestamp
+watermark = max_timestamp - allowed_lateness  # 5 seconds behind latest
+if event.timestamp < watermark:
+    send_to_dlq(event)  # Too late!
+```
+
+### **2. Stateful Processing & Partitioning**
+```python
+# All events for same key → same processor instance  
+.key_by(lambda event: event['card_id'])     # Fraud detection
+.key_by(lambda event: event['user_id'])     # Personalization
+
+# Each processor maintains state per key
+state = {
+    'card_123': {'txn_count': 5, 'amount_sum': 1250.0},
+    'card_456': {'txn_count': 2, 'amount_sum': 300.0}
+}
+```
+
+### **3. Windowed Aggregations**
+```python
+# Sliding 5-minute windows for real-time features
+window = SlidingWindow(window_size_ms=5*60*1000)
+window.add_event(timestamp, event)
+
+# Compute features over window
+features = {
+    'txn_count_5m': len(window.events),
+    'amount_avg_5m': sum(amounts) / len(amounts),
+    'velocity_score': len(events) / time_span_hours
+}
+```
+
+---
+
+## 🚨 **Fraud Detection Features**
+```python
+# Real-time risk indicators
+features = {
+    'txn_count_5m': 8,                    # High frequency
+    'unique_countries_5m': 3,             # Geographic spread  
+    'velocity_score': 0.9,               # Very fast transactions
+    'high_risk_txn_ratio': 0.4,          # 40% high-risk merchants
+    'time_since_last_txn_min': 0.5       # 30 seconds apart
+}
+
+# Risk flags for immediate alerting
+if features['velocity_score'] > 0.7 and features['unique_countries_5m'] > 2:
+    metadata['risk_flags'] = 'high_velocity_geo_anomaly'
+```
+
+## 🎯 **Personalization Features**
+```python
+# User engagement patterns
+features = {
+    'session_duration_min': 12.5,        # Active session
+    'page_views_5m': 15,                 # High engagement
+    'cart_conversion_rate': 0.3,         # Strong purchase intent
+    'category_affinity': 'electronics',   # Primary interest
+    'engagement_score': 0.85             # Highly engaged user
+}
+```
+
+---
+
+## 🔄 **Exactly-Once vs At-Least-Once**
+
+### **Exactly-Once (Flink Production)**
+```python
+# Coordinated checkpointing every 30 seconds
+env.enable_checkpointing(30000)
+env.get_checkpoint_config().set_checkpointing_mode(EXACTLY_ONCE)
+
+# On failure: restore state + replay from last checkpoint
+# Result: No duplicates, no data loss
+```
+
+### **At-Least-Once (Simplified)**
+```python
+# Auto-commit every 5 seconds
+consumer = KafkaConsumer(enable_auto_commit=True)
+
+# On failure: may reprocess some events
+# Result: Possible duplicates, but simpler to implement
+```
+
+---
+
+## 🎛️ **Feature Sink: Redis Storage**
+```python
+# Multi-layer storage strategy
+feature_key = f"features:card:{card_id}:transaction"      # Current features
+latest_key = f"features:latest:card:{card_id}"           # Quick lookup
+ts_key = f"features:ts:card:{card_id}:transaction"       # Time series
+
+# TTL for automatic cleanup
+redis.set(feature_key, features, ex=24*3600)  # 24-hour TTL
+```
+
+---
+
+## 🧪 **Testing Without Infrastructure**
+```python
+# Mock Kafka for unit testing
+class MockKafkaConsumer:
+    def __init__(self, events):
+        self.events = iter(events)
+    def __iter__(self):
+        return self.events
+
+# Test feature computation logic
+test_events = [generate_test_transaction()]
+processor = TransactionFeatureComputer(config)
+features = processor.process_event(test_events[0])
+assert features['txn_count_5m'] == 1
+```
+
+---
+
+## 💡 **Key Architectural Decisions**
+
+| Aspect | Flink Job | Simplified |
+|--------|-----------|------------|
+| **Deployment** | Distributed cluster | Single process |
+| **State** | RocksDB + checkpoints | In-memory dictionaries |
+| **Fault Tolerance** | Exactly-once | Manual restart |
+| **Throughput** | 50k+ events/sec | 1k events/sec |
+| **Development** | Complex setup | Simple Python |
+| **Use Case** | Production | Development/Testing |
+
+---
+
+## 🚀 **Interview Talking Points**
+
+**"I built both approaches to understand trade-offs:**
+- **Flink for production**: Exactly-once semantics, fault tolerance, scale
+- **Simplified for development**: Fast iteration, easy debugging, local testing
+- **Same business logic**: Fraud detection algorithms work identically
+- **Progressive enhancement**: Start simple, add complexity when needed"
+
+---
+
 ## Python Abstract Learnt
 
 python can have two classes inherited, the order matters (both define functions, the one goes first gets executed)
