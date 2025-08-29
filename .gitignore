@@ -2,6 +2,8 @@
 *.pyc
 # Python
 **/__pycache__/
+**/__pycache__/**
+generators/__pycache__/*
 *.py[cod]
 *.pyo
 *.pyd
