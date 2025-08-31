@@ -1,16 +1,19 @@
+# fixes: make kafka healthcheck target the in-network broker; add sane restart policies
+
 services:
-  # === CORE INFRASTRUCTURE ===
   kafka:
     image: docker.redpanda.com/redpandadata/redpanda:v23.3.3
     container_name: kafka
     command: ["redpanda","start","--overprovisioned","--smp","1","--memory","1G","--reserve-memory","0M","--node-id","0","--check=false","--kafka-addr","0.0.0.0:9092","--advertise-kafka-addr","kafka:9092"]
     ports: [ "9092:9092", "9644:9644" ]
     healthcheck:
-      test: ["CMD-SHELL", "rpk cluster info"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-  
+      # explicitly tell rpk which broker to ping (avoid localhost flakiness)
+      test: ["CMD-SHELL", "rpk cluster info -X brokers=kafka:9092 >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   schema-registry:
     image: confluentinc/cp-schema-registry:7.7.0
     container_name: schema-registry
@@ -18,44 +21,39 @@ services:
       SCHEMA_REGISTRY_KAFKASTORE_BOOTSTRAP_SERVERS: "kafka:9092"
       SCHEMA_REGISTRY_KAFKASTORE_SECURITY_PROTOCOL: "PLAINTEXT"
       SCHEMA_REGISTRY_HOST_NAME: schema-registry
-      SCHEMA_REGISTRY_LISTENERS: http://0.0.0.0:8081
+      SCHEMA_REGISTRY_LISTENERS: "http://0.0.0.0:8081"
     ports: [ "8081:8081" ]
     depends_on:
       kafka:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/subjects"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-  
+      test: ["CMD", "curl", "-fsS", "http://localhost:8081/subjects"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   redis:
     image: redis:7-alpine
     container_name: redis
     ports: [ "6379:6379" ]
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
-  # === EVENT GENERATORS ===
   txn-generator:
     build:
       context: ..
       dockerfile: generators/Dockerfile
     container_name: txn-generator
-    environment:
-      - EVENTS_PER_SECOND=10
-      - DURATION=3600
-      - KAFKA_SERVERS=kafka:9092
-      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
-    command: ["txgen.py", "--events-per-second", "10", "--duration", "3600"]
+    command: ["generators/txgen.py","--events-per-second","3","--duration","3600","--bootstrap-servers","kafka:9092"]
     depends_on:
       kafka:
         condition: service_healthy
-      schema-registry:
-        condition: service_healthy
+    restart: on-failure
     profiles: ["generators", "all"]
 
   click-generator:
@@ -63,18 +61,13 @@ services:
       context: ..
       dockerfile: generators/Dockerfile
     container_name: click-generator
-    environment:
-      - EVENTS_PER_SECOND=15
-      - DURATION=3600
-      - KAFKA_SERVERS=kafka:9092
-      - SCHEMA_REGISTRY_URL=http://schema-registry:8081
-    command: ["clickgen.py", "--events-per-second", "15", "--duration", "3600"]
+    command: ["generators/clickgen.py","--events-per-second","4","--duration","3600","--bootstrap-servers","kafka:9092"]
     depends_on:
       kafka:
         condition: service_healthy
-      schema-registry:
-        condition: service_healthy
+    restart: on-failure
     profiles: ["generators", "all"]
+
 
   # === STREAM PROCESSING ===
   stream-processor:

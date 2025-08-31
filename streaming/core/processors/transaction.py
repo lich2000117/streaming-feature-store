@@ -11,11 +11,11 @@ from typing import Dict, Any
 from collections import defaultdict
 import structlog
 
-from consumers.core.models.config import ProcessorConfig, FeatureJobConfig
-from consumers.core.models.events import TransactionEvent
-from consumers.core.models.features import TransactionFeatures
-from consumers.core.utils.windowing import SlidingWindow
-from consumers.core.utils.metrics import FEATURES_COMPUTED, WINDOW_SIZE, PROCESSING_DURATION
+from streaming.core.models.config import ProcessorConfig, FeatureJobConfig
+from streaming.core.models.events import TransactionEvent
+from streaming.core.models.features import TransactionFeatures
+from streaming.core.utils.windowing import SlidingWindow
+from streaming.core.utils.metrics import FEATURES_COMPUTED, WINDOW_SIZE, PROCESSING_DURATION
 
 logger = structlog.get_logger(__name__)
 

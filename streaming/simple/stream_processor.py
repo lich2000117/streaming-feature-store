@@ -22,7 +22,7 @@ from typing import Dict, Any
 from collections import defaultdict
 import logging
 
-# Add project root to path (go up two levels from consumers/simple/ to project root)
+# Add project root to path (go up two levels from streaming/simple/ to project root)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 from kafka import KafkaConsumer
@@ -31,13 +31,13 @@ import structlog
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
 
 # Import our modular components
-from consumers.core.models.config import ProcessorConfig
-from consumers.core.utils.watermarks import WatermarkGenerator, WatermarkConfig, LateEventHandler
-from consumers.core.utils.avro import AvroDeserializer
-from consumers.core.sinks.redis_sink import FeatureSink
-from consumers.core.processors.transaction import TransactionFeatureComputer
-from consumers.core.processors.clickstream import ClickstreamFeatureComputer
-from consumers.core.utils.metrics import EVENTS_PROCESSED, PROCESSING_DURATION
+from streaming.core.models.config import ProcessorConfig
+from streaming.core.utils.watermarks import WatermarkGenerator, WatermarkConfig, LateEventHandler
+from streaming.core.utils.avro import AvroDeserializer
+from streaming.core.sinks.redis_sink import FeatureSink
+from streaming.core.processors.transaction import TransactionFeatureComputer
+from streaming.core.processors.clickstream import ClickstreamFeatureComputer
+from streaming.core.utils.metrics import EVENTS_PROCESSED, PROCESSING_DURATION
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

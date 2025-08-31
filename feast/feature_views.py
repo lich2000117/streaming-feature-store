@@ -7,7 +7,7 @@ by the streaming pipeline and served for online inference.
 """
 
 from datetime import timedelta
-from feast import FeatureView, Field, FileSource, RedisSource
+from feast import FeatureView, Field, FileSource
 from feast.types import Float32, Float64, Int32, Int64, String, Bool, Array
 from entities import card_entity, user_entity, device_entity, session_entity
 
@@ -15,13 +15,8 @@ from entities import card_entity, user_entity, device_entity, session_entity
 # Data Sources
 # These connect to our feature storage (Redis for online, files for offline)
 
-# Redis source for online serving (matches our stream processor output)
-redis_source = RedisSource(
-    name="streaming_features_redis",
-    redis_host="localhost",
-    redis_port=6379,
-    key_format="features:{entity_type}:{entity_id}"
-)
+# Note: Redis is now configured in feature_store.yaml as the online store
+# We no longer need to define a RedisSource separately
 
 # File source for offline features (for training)
 offline_source = FileSource(

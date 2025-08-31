@@ -30,3 +30,6 @@ prometheus-client==0.21.0
 
 # Logging
 structlog==24.1.0
+
+
+python-snappy>=0.7.1

@@ -1,32 +1,20 @@
 # Feast Feature Store Configuration
-# This configuration defines the core feature store setup for real-time ML
-
-project: streaming-feature-store
+project: fraud_detection
 provider: local
-registry:
-  registry_type: sql
-  path: feast/registry.db
-  
-# Online store configuration (Redis for low-latency serving)
+registry: data/registry.db
+
 online_store:
   type: redis
-  connection_string: "localhost:6379"
-  database: 0
-  
-# Offline store configuration (File-based for development, can be BigQuery/Snowflake in production)
+  connection_string: "redis:6379"
+
 offline_store:
   type: file
-  
-# Entity key serialization (for consistent feature keys)
+
 entity_key_serialization_version: 2
 
-# Feature serving configuration
 feature_server:
-  enabled: true
-  host: "0.0.0.0"
-  port: 6566
-  
-# Flags for advanced features
+  enabled: true   # ❌ drop host/port here
+
 flags:
   alpha_features: true
   beta_features: true

@@ -11,7 +11,7 @@ import structlog
 import avro.schema
 import avro.io
 
-from consumers.core.models.config import ProcessorConfig
+from streaming.core.models.config import ProcessorConfig
 
 logger = structlog.get_logger(__name__)
 

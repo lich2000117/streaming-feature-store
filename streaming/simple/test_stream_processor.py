@@ -17,12 +17,12 @@ import logging
 # Add parent directory to path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from consumers.simple.stream_processor import StreamProcessor
-from consumers.core.models.config import ProcessorConfig
-from consumers.core.processors.transaction import TransactionFeatureComputer
-from consumers.core.processors.clickstream import ClickstreamFeatureComputer
-from consumers.core.sinks.redis_sink import FeatureSink
-from consumers.core.utils.watermarks import WatermarkGenerator, WatermarkConfig
+from streaming.simple.stream_processor import StreamProcessor
+from streaming.core.models.config import ProcessorConfig
+from streaming.core.processors.transaction import TransactionFeatureComputer
+from streaming.core.processors.clickstream import ClickstreamFeatureComputer
+from streaming.core.sinks.redis_sink import FeatureSink
+from streaming.core.utils.watermarks import WatermarkGenerator, WatermarkConfig
 from generators.txgen import TransactionGenerator
 from generators.clickgen import ClickstreamGenerator
 

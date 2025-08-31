@@ -13,7 +13,7 @@ Key capabilities:
 - Cross-stream joins
 - Late event handling with DLQ
 - Real-time feature materialization to Redis
-- Uses modular shared components from consumers.core.*
+- Uses modular shared components from streaming.core.*
 """
 
 import os
@@ -41,12 +41,12 @@ import click
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
 
 # Import shared components
-from consumers.core.models.config import FeatureJobConfig
-from consumers.core.models.events import TransactionEvent, ClickEvent
-from consumers.core.models.features import TransactionFeatures, ClickstreamFeatures
-from consumers.core.processors.transaction import compute_transaction_features_from_window
-from consumers.core.processors.clickstream import compute_clickstream_features_from_window
-from consumers.core.sinks.redis_sink import FlinkRedisSink
+from streaming.core.models.config import FeatureJobConfig
+from streaming.core.models.events import TransactionEvent, ClickEvent
+from streaming.core.models.features import TransactionFeatures, ClickstreamFeatures
+from streaming.core.processors.transaction import compute_transaction_features_from_window
+from streaming.core.processors.clickstream import compute_clickstream_features_from_window
+from streaming.core.sinks.redis_sink import FlinkRedisSink
 
 # Configure structured logging
 logging.basicConfig(level=logging.INFO)

@@ -12,25 +12,26 @@ down:       ## Stop all services and cleanup
 
 # === SERVICE MANAGEMENT ===
 generate:   ## Start event generators
-	docker compose -f infra/docker-compose.yml --profile generators up -d
+	docker compose -f infra/docker-compose.yml --profile generators up -d --build
 
 stream:     ## Start stream processing
-	docker compose -f infra/docker-compose.yml --profile streaming up -d
+	docker compose -f infra/docker-compose.yml --profile streaming up -d --build
 
 serve:      ## Start inference API
-	docker compose -f infra/docker-compose.yml --profile inference up -d
+	docker compose -f infra/docker-compose.yml --profile inference up -d --build
 
 train:      ## Run ML training pipeline
-	docker compose -f infra/docker-compose.yml --profile training up training-job
+	docker compose -f infra/docker-compose.yml --profile training up training-job --build
 
-feast:      ## Start feature store server
-	docker compose -f infra/docker-compose.yml --profile feast up -d
+feast_up:      ## Start feature store server, and apply feature definitions
+	docker compose -f infra/docker-compose.yml --profile feast up -d --build
+	docker exec -it feast-server feast apply
 
 monitor:    ## Start monitoring stack (prometheus, grafana)
-	docker compose -f infra/docker-compose.yml --profile monitoring up -d
+	docker compose -f infra/docker-compose.yml --profile monitoring up -d --build
 
 # === TESTING & VALIDATION ===
-test:       ## Test inference API endpoints
+test-api:       ## Test inference API endpoints
 	@echo "🧪 Testing Fraud Detection API..."
 	curl -X POST http://localhost:8080/score/fraud \
 		-H "Content-Type: application/json" \
@@ -44,7 +45,7 @@ health:     ## Check service health status
 	@echo "=== 🏥 Health Check ==="
 	@echo "📊 Kafka:"
 	@docker exec kafka rpk cluster info || echo "❌ Kafka unhealthy"
-	@echo "\n💾 Redis:" 
+	@echo "\n💾 Redis:" make
 	@docker exec redis redis-cli ping || echo "❌ Redis unhealthy"
 	@echo "\n🚀 API:"
 	@curl -s http://localhost:8080/health | jq . || echo "❌ API unhealthy"
@@ -54,7 +55,7 @@ status:     ## Show service status
 	@docker compose -f infra/docker-compose.yml ps
 
 # === OBSERVABILITY ===
-logs:       ## View all service logs
+logs-check:       ## View all service logs
 	docker compose -f infra/docker-compose.yml logs -f
 
 logs-api:   ## View inference API logs
@@ -62,6 +63,9 @@ logs-api:   ## View inference API logs
 
 logs-stream: ## View stream processor logs
 	docker compose -f infra/docker-compose.yml logs -f stream-processor
+
+logs-feast: ## View feature store logs
+	docker compose -f infra/docker-compose.yml logs -f feast-server
 
 logs-gen:   ## View generator logs
 	docker compose -f infra/docker-compose.yml logs -f txn-generator click-generator

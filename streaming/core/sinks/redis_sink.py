@@ -11,7 +11,7 @@ import redis
 import structlog
 from prometheus_client import Counter
 
-from consumers.core.models.config import ProcessorConfig, FeatureJobConfig
+from streaming.core.models.config import ProcessorConfig, FeatureJobConfig
 
 logger = structlog.get_logger(__name__)
 

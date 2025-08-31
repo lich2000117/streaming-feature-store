@@ -7,41 +7,41 @@ Framework-agnostic components for streaming feature engineering. Used by both si
 ### **Models** (`models/`)
 ```python
 # Event schemas with validation
-from consumers.core.models.events import TransactionEvent, ClickEvent
+from streaming.core.models.events import TransactionEvent, ClickEvent
 
 # Feature output schemas  
-from consumers.core.models.features import TransactionFeatures, ClickstreamFeatures
+from streaming.core.models.features import TransactionFeatures, ClickstreamFeatures
 
 # Configuration management
-from consumers.core.models.config import ProcessorConfig, FeatureJobConfig
+from streaming.core.models.config import ProcessorConfig, FeatureJobConfig
 ```
 
 ### **Processors** (`processors/`)
 ```python
 # Business logic for feature computation
-from consumers.core.processors.transaction import TransactionFeatureComputer
-from consumers.core.processors.clickstream import ClickstreamFeatureComputer
+from streaming.core.processors.transaction import TransactionFeatureComputer
+from streaming.core.processors.clickstream import ClickstreamFeatureComputer
 
 # Shared utility functions for windowed aggregations
-from consumers.core.processors.transaction import compute_transaction_features_from_window
+from streaming.core.processors.transaction import compute_transaction_features_from_window
 ```
 
 ### **Sinks** (`sinks/`)  
 ```python
 # Redis feature storage with proper serialization
-from consumers.core.sinks.redis_sink import FeatureSink, FlinkRedisSink
+from streaming.core.sinks.redis_sink import FeatureSink, FlinkRedisSink
 ```
 
 ### **Utils** (`utils/`)
 ```python
 # Avro schema management and deserialization
-from consumers.core.utils.avro import AvroDeserializer, AvroSerializer
+from streaming.core.utils.avro import AvroDeserializer, AvroSerializer
 
 # Time-based windowing for aggregations
-from consumers.core.utils.windowing import SlidingWindow
+from streaming.core.utils.windowing import SlidingWindow
 
 # Event-time processing and watermarking  
-from consumers.core.utils.watermarks import WatermarkGenerator, LateEventHandler
+from streaming.core.utils.watermarks import WatermarkGenerator, LateEventHandler
 ```
 
 ## 🏗️ Design Principles
@@ -65,8 +65,8 @@ from consumers.core.utils.watermarks import WatermarkGenerator, LateEventHandler
 
 ### **Feature Computation**
 ```python
-from consumers.core.processors.transaction import compute_transaction_features_from_window
-from consumers.core.models.config import ProcessorConfig
+from streaming.core.processors.transaction import compute_transaction_features_from_window
+from streaming.core.models.config import ProcessorConfig
 
 # Configure processor
 config = ProcessorConfig(window_size_minutes=5)
@@ -80,8 +80,8 @@ features = compute_transaction_features_from_window(events, config)
 
 ### **Avro Deserialization**
 ```python
-from consumers.core.utils.avro import AvroDeserializer
-from consumers.core.models.config import ProcessorConfig
+from streaming.core.utils.avro import AvroDeserializer
+from streaming.core.models.config import ProcessorConfig
 
 # Initialize with schema directory
 config = ProcessorConfig(schema_dir="schemas")
@@ -93,8 +93,8 @@ event = deserializer.deserialize_message("txn.events", avro_bytes)
 
 ### **Redis Storage**  
 ```python
-from consumers.core.sinks.redis_sink import FeatureSink
-from consumers.core.models.config import ProcessorConfig
+from streaming.core.sinks.redis_sink import FeatureSink
+from streaming.core.models.config import ProcessorConfig
 
 # Initialize Redis sink
 config = ProcessorConfig(redis_host="localhost", redis_port=6379)
