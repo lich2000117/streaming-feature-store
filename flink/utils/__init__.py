@@ -1,1 +1,0 @@
-# Flink utilities package

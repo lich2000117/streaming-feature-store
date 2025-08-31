@@ -37,14 +37,11 @@ from consumers.core.utils.avro import AvroDeserializer
 from consumers.core.sinks.redis_sink import FeatureSink
 from consumers.core.processors.transaction import TransactionFeatureComputer
 from consumers.core.processors.clickstream import ClickstreamFeatureComputer
+from consumers.core.utils.metrics import EVENTS_PROCESSED, PROCESSING_DURATION
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = structlog.get_logger(__name__)
-
-# Metrics
-EVENTS_PROCESSED = Counter('stream_events_processed_total', 'Total events processed', ['topic', 'status'])
-PROCESSING_LATENCY = Histogram('stream_processing_latency_seconds', 'Processing latency')
 
 
 # Removed - now using modular components from processors/, sinks/, utils/
@@ -118,8 +115,8 @@ class StreamProcessor:
     def process_message(self, message):
         """Process a single Kafka message."""
         try:
-            with PROCESSING_LATENCY.time():
-                topic = message.topic
+            topic = message.topic
+            with PROCESSING_DURATION.labels(event_type=topic, processor='simple').time():
                 
                 # Deserialize Avro message
                 event = self.avro_deserializer.deserialize_message(topic, message.value)
@@ -139,7 +136,7 @@ class StreamProcessor:
                                   lateness_ms=watermark_gen.get_current_watermark() - event_timestamp,
                                   action=action)
                     if action == 'dropped':
-                        EVENTS_PROCESSED.labels(topic=topic, status='dropped_late').inc()
+                        EVENTS_PROCESSED.labels(event_type=topic, status='dropped_late').inc()
                         return
                 
                 # Process based on topic
@@ -156,13 +153,13 @@ class StreamProcessor:
                 else:
                     status = 'processing_error'
                     
-                EVENTS_PROCESSED.labels(topic=topic, status=status).inc()
+                EVENTS_PROCESSED.labels(event_type=topic, status=status).inc()
                 
         except Exception as e:
             logger.error("Error processing message",
                         topic=message.topic,
                         error=str(e))
-            EVENTS_PROCESSED.labels(topic=message.topic, status='error').inc()
+            EVENTS_PROCESSED.labels(event_type=message.topic, status='error').inc()
 
 
 # Removed - numpy calculation now handled in processor modules

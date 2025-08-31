@@ -9,18 +9,14 @@ import time
 from typing import Dict, Any
 from collections import defaultdict
 import structlog
-from prometheus_client import Counter, Gauge
 
 from consumers.core.models.config import ProcessorConfig
 from consumers.core.models.events import ClickEvent
 from consumers.core.models.features import ClickstreamFeatures
 from consumers.core.utils.windowing import SlidingWindow
+from consumers.core.utils.metrics import FEATURES_COMPUTED, WINDOW_SIZE, PROCESSING_DURATION
 
 logger = structlog.get_logger(__name__)
-
-# Metrics
-FEATURES_COMPUTED = Counter('features_computed_total', 'Total features computed', ['feature_type'])
-WINDOW_SIZE = Gauge('window_size', 'Current window size', ['window_type'])
 
 
 class ClickstreamFeatureComputer:
@@ -145,8 +141,8 @@ class ClickstreamFeatureComputer:
                 'window_event_count': len(window_events)
             }
             
-            FEATURES_COMPUTED.labels(feature_type='clickstream').inc()
-            WINDOW_SIZE.labels(window_type='clickstream').set(len(window_events))
+            FEATURES_COMPUTED.labels(feature_type='clickstream', entity_type='user').inc()
+            WINDOW_SIZE.labels(window_type='clickstream', processor='simple').set(len(window_events))
             
             return features
             

@@ -3,6 +3,7 @@
 # Python
 **/__pycache__/
 **/__pycache__/**
+
 *.py[cod]
 *.pyo
 *.pyd
@@ -56,3 +57,6 @@ pytest_cache/
 *.bak
 *.swp
 *.tmp
+
+
+schemas/examples/

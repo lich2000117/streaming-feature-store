@@ -10,18 +10,14 @@ from datetime import datetime
 from typing import Dict, Any
 from collections import defaultdict
 import structlog
-from prometheus_client import Counter, Gauge
 
 from consumers.core.models.config import ProcessorConfig, FeatureJobConfig
 from consumers.core.models.events import TransactionEvent
 from consumers.core.models.features import TransactionFeatures
 from consumers.core.utils.windowing import SlidingWindow
+from consumers.core.utils.metrics import FEATURES_COMPUTED, WINDOW_SIZE, PROCESSING_DURATION
 
 logger = structlog.get_logger(__name__)
-
-# Metrics
-FEATURES_COMPUTED = Counter('features_computed_total', 'Total features computed', ['feature_type'])
-WINDOW_SIZE = Gauge('window_size', 'Current window size', ['window_type'])
 
 
 class TransactionFeatureComputer:
@@ -132,8 +128,8 @@ class TransactionFeatureComputer:
                 'window_event_count': len(window_events)
             }
             
-            FEATURES_COMPUTED.labels(feature_type='transaction').inc()
-            WINDOW_SIZE.labels(window_type='transaction').set(len(window_events))
+            FEATURES_COMPUTED.labels(feature_type='transaction', entity_type='card').inc()
+            WINDOW_SIZE.labels(window_type='transaction', processor='simple').set(len(window_events))
             
             return features
             
