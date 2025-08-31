@@ -1,0 +1,343 @@
+#!/usr/bin/env python3
+"""
+Dataset creation from feature store.
+
+This module handles:
+- Feature retrieval from Redis feature store
+- Label generation for fraud detection and personalization
+- Data quality validation and preprocessing
+- Train/validation/test splits
+"""
+
+import json
+import time
+import logging
+from datetime import datetime, timedelta
+from typing import Dict, Any, List, Tuple, Optional
+import random
+
+import pandas as pd
+import numpy as np
+import redis
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+
+from config import TrainingConfig, FRAUD_FEATURES
+
+logger = logging.getLogger(__name__)
+
+
+class FeatureStoreDataset:
+    """Dataset creator that interfaces with our Redis feature store."""
+    
+    def __init__(self, config: TrainingConfig):
+        self.config = config
+        self.redis_client = redis.Redis(
+            host=config.data.redis_host,
+            port=config.data.redis_port,
+            db=config.data.redis_db,
+            decode_responses=True
+        )
+        self.scaler = StandardScaler()
+        self.label_encoder = LabelEncoder()
+        
+    def create_fraud_dataset(self) -> Tuple[pd.DataFrame, pd.Series]:
+        """Create fraud detection dataset from feature store."""
+        logger.info("Creating fraud detection dataset from feature store")
+        
+        # Get all card entities with features
+        card_features = self._get_card_features()
+        logger.info(f"Retrieved features for {len(card_features)} cards")
+        
+        if len(card_features) < self.config.data.min_samples_per_entity:
+            logger.warning(f"Insufficient data: {len(card_features)} cards, minimum required: {self.config.data.min_samples_per_entity}")
+            return pd.DataFrame(), pd.Series()
+        
+        # Convert to DataFrame
+        df = pd.DataFrame(card_features)
+        
+        # Generate fraud labels
+        df = self._generate_fraud_labels(df)
+        
+        # Validate data quality
+        df = self._validate_data_quality(df)
+        
+        # Prepare features and target
+        feature_cols = [col for col in FRAUD_FEATURES if col in df.columns]
+        X = df[feature_cols].copy()
+        y = df['is_fraud'].copy()
+        
+        logger.info(f"Created dataset: {X.shape[0]} samples, {X.shape[1]} features")
+        logger.info(f"Fraud rate: {y.mean():.2%}")
+        
+        return X, y
+    
+    def _get_card_features(self) -> List[Dict[str, Any]]:
+        """Retrieve all card features from Redis."""
+        features_list = []
+        
+        # Get all card feature keys
+        pattern = "features:card:*:transaction"
+        card_keys = self.redis_client.keys(pattern)
+        
+        logger.info(f"Found {len(card_keys)} card feature keys")
+        
+        for key in card_keys:
+            try:
+                # Extract card ID from key
+                card_id = key.split(':')[2]
+                
+                # Get features from Redis
+                raw_features = self.redis_client.hgetall(key)
+                
+                if not raw_features:
+                    continue
+                    
+                # Parse features
+                features = self._parse_redis_features(raw_features)
+                features['card_id'] = card_id
+                
+                # Add timestamp if available
+                if 'feature_timestamp' in features:
+                    features['timestamp'] = pd.to_datetime(features['feature_timestamp'], unit='ms')
+                
+                features_list.append(features)
+                
+            except Exception as e:
+                logger.warning(f"Failed to process key {key}: {e}")
+                continue
+        
+        return features_list
+    
+    def _parse_redis_features(self, redis_data: Dict[str, str]) -> Dict[str, Any]:
+        """Parse Redis string values back to appropriate types."""
+        parsed = {}
+        
+        for key, value in redis_data.items():
+            if key in ['entity_id', 'entity_type', 'feature_type']:
+                parsed[key] = value
+                continue
+                
+            try:
+                # Try to parse as number
+                if '.' in value or 'e' in value.lower():
+                    parsed[key] = float(value)
+                else:
+                    parsed[key] = int(value)
+            except ValueError:
+                try:
+                    # Try to parse as boolean
+                    if value.lower() in ('true', 'false'):
+                        parsed[key] = value.lower() == 'true'
+                    else:
+                        # Keep as string
+                        parsed[key] = value
+                except:
+                    parsed[key] = value
+                    
+        return parsed
+    
+    def _generate_fraud_labels(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Generate fraud labels based on feature patterns."""
+        logger.info("Generating fraud labels based on feature patterns")
+        
+        # Initialize fraud labels
+        df['is_fraud'] = False
+        
+        # Rule-based fraud detection for synthetic labels
+        fraud_conditions = [
+            # High velocity transactions
+            (df['velocity_score'] > 0.8) & (df['txn_count_5m'] > 5),
+            
+            # Geographic anomalies
+            (df['geo_diversity_score'] > 0.7) & (df['unique_countries_5m'] > 2),
+            
+            # High-risk merchant categories
+            df['has_high_risk_mcc'] & (df['amount_avg_5m'] > 500),
+            
+            # Unusual timing patterns
+            df['is_weekend'] & (df.get('hour_of_day', 12) < 6),  # Late night weekend
+            
+            # Amount anomalies
+            (df['amount_max_5m'] > 1000) & (df['txn_count_5m'] == 1),  # Single large transaction
+        ]
+        
+        # Apply fraud rules with different weights
+        fraud_scores = np.zeros(len(df))
+        weights = [0.4, 0.3, 0.2, 0.1, 0.3]  # Different importance weights
+        
+        for condition, weight in zip(fraud_conditions, weights):
+            fraud_scores += condition.astype(float) * weight
+        
+        # Set fraud threshold to achieve target fraud rate
+        target_fraud_count = int(len(df) * self.config.data.fraud_rate_target)
+        fraud_threshold = np.sort(fraud_scores)[-target_fraud_count] if target_fraud_count > 0 else 1.0
+        
+        df['is_fraud'] = fraud_scores >= fraud_threshold
+        df['fraud_score'] = fraud_scores
+        
+        # Add some randomness to make it more realistic
+        random_fraud = np.random.random(len(df)) < 0.005  # 0.5% random fraud
+        df['is_fraud'] = df['is_fraud'] | random_fraud
+        
+        fraud_rate = df['is_fraud'].mean()
+        logger.info(f"Generated fraud labels: {fraud_rate:.2%} fraud rate")
+        
+        return df
+    
+    def _validate_data_quality(self, df: pd.DataFrame) -> pd.DataFrame:
+        """Validate and clean data quality issues."""
+        logger.info("Validating data quality")
+        
+        initial_rows = len(df)
+        
+        # Remove rows with too many missing values
+        missing_rate = df.isnull().sum(axis=1) / len(df.columns)
+        df = df[missing_rate <= self.config.data.max_missing_rate]
+        
+        # Handle missing values
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df[numeric_cols] = df[numeric_cols].fillna(df[numeric_cols].median())
+        
+        # Handle categorical missing values
+        categorical_cols = df.select_dtypes(include=['object', 'bool']).columns
+        for col in categorical_cols:
+            if col in df.columns:
+                df[col] = df[col].fillna(df[col].mode()[0] if len(df[col].mode()) > 0 else False)
+        
+        # Remove outliers using IQR method for key numerical features
+        key_features = ['amount_avg_5m', 'amount_sum_5m', 'velocity_score']
+        for feature in key_features:
+            if feature in df.columns:
+                Q1 = df[feature].quantile(0.25)
+                Q3 = df[feature].quantile(0.75)
+                IQR = Q3 - Q1
+                lower_bound = Q1 - 1.5 * IQR
+                upper_bound = Q3 + 1.5 * IQR
+                
+                outlier_mask = (df[feature] < lower_bound) | (df[feature] > upper_bound)
+                df = df[~outlier_mask]
+        
+        logger.info(f"Data quality validation: {initial_rows} -> {len(df)} rows ({len(df)/initial_rows:.1%} retained)")
+        
+        return df
+    
+    def create_train_val_test_split(self, X: pd.DataFrame, y: pd.Series) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.Series, pd.Series, pd.Series]:
+        """Create stratified train/validation/test splits."""
+        logger.info("Creating train/validation/test splits")
+        
+        # First split: train+val vs test
+        X_temp, X_test, y_temp, y_test = train_test_split(
+            X, y,
+            test_size=self.config.model.test_size,
+            stratify=y,
+            random_state=42
+        )
+        
+        # Second split: train vs validation
+        val_size_adjusted = self.config.model.validation_size / (1 - self.config.model.test_size)
+        X_train, X_val, y_train, y_val = train_test_split(
+            X_temp, y_temp,
+            test_size=val_size_adjusted,
+            stratify=y_temp,
+            random_state=42
+        )
+        
+        logger.info(f"Data splits - Train: {len(X_train)}, Val: {len(X_val)}, Test: {len(X_test)}")
+        logger.info(f"Train fraud rate: {y_train.mean():.2%}")
+        logger.info(f"Val fraud rate: {y_val.mean():.2%}")
+        logger.info(f"Test fraud rate: {y_test.mean():.2%}")
+        
+        return X_train, X_val, X_test, y_train, y_val, y_test
+    
+    def prepare_features(self, X_train: pd.DataFrame, X_val: pd.DataFrame, X_test: pd.DataFrame) -> Tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame]:
+        """Prepare features for training (scaling, encoding, etc.)."""
+        logger.info("Preparing features for training")
+        
+        # Identify numeric and categorical columns
+        numeric_cols = X_train.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_cols = X_train.select_dtypes(include=['object']).columns.tolist()
+        boolean_cols = X_train.select_dtypes(include=['bool']).columns.tolist()
+        
+        logger.info(f"Feature types - Numeric: {len(numeric_cols)}, Categorical: {len(categorical_cols)}, Boolean: {len(boolean_cols)}")
+        
+        # Prepare copies
+        X_train_prep = X_train.copy()
+        X_val_prep = X_val.copy()
+        X_test_prep = X_test.copy()
+        
+        # Scale numeric features
+        if numeric_cols:
+            X_train_prep[numeric_cols] = self.scaler.fit_transform(X_train[numeric_cols])
+            X_val_prep[numeric_cols] = self.scaler.transform(X_val[numeric_cols])
+            X_test_prep[numeric_cols] = self.scaler.transform(X_test[numeric_cols])
+        
+        # Convert boolean to numeric
+        for col in boolean_cols:
+            X_train_prep[col] = X_train_prep[col].astype(int)
+            X_val_prep[col] = X_val_prep[col].astype(int)
+            X_test_prep[col] = X_test_prep[col].astype(int)
+        
+        # Handle categorical variables (if any)
+        for col in categorical_cols:
+            # Simple label encoding for now
+            combined_values = pd.concat([X_train[col], X_val[col], X_test[col]])
+            self.label_encoder.fit(combined_values.astype(str))
+            
+            X_train_prep[col] = self.label_encoder.transform(X_train[col].astype(str))
+            X_val_prep[col] = self.label_encoder.transform(X_val[col].astype(str))
+            X_test_prep[col] = self.label_encoder.transform(X_test[col].astype(str))
+        
+        return X_train_prep, X_val_prep, X_test_prep
+    
+    def create_personalization_dataset(self) -> Tuple[pd.DataFrame, pd.Series]:
+        """Create personalization dataset (placeholder for future implementation)."""
+        logger.info("Personalization dataset creation not yet implemented")
+        return pd.DataFrame(), pd.Series()
+
+
+def create_synthetic_features_for_testing(n_samples: int = 1000, fraud_rate: float = 0.02) -> Tuple[pd.DataFrame, pd.Series]:
+    """Create synthetic feature data for testing when Redis is not available."""
+    logger.info(f"Creating synthetic dataset with {n_samples} samples for testing")
+    
+    np.random.seed(42)
+    
+    # Generate synthetic features
+    data = {
+        'txn_count_5m': np.random.poisson(2, n_samples),
+        'txn_count_30m': np.random.poisson(10, n_samples),
+        'amount_avg_5m': np.random.lognormal(4, 1, n_samples),
+        'amount_sum_5m': np.random.lognormal(5, 1, n_samples),
+        'amount_max_5m': np.random.lognormal(5.5, 1.5, n_samples),
+        'amount_std_5m': np.random.exponential(50, n_samples),
+        'unique_countries_5m': np.random.choice([1, 2, 3], n_samples, p=[0.8, 0.15, 0.05]),
+        'geo_diversity_score': np.random.beta(2, 5, n_samples),
+        'time_since_last_txn_min': np.random.exponential(60, n_samples),
+        'is_weekend': np.random.choice([True, False], n_samples, p=[0.2, 0.8]),
+        'hour_of_day': np.random.randint(0, 24, n_samples),
+        'velocity_score': np.random.beta(2, 8, n_samples),
+        'high_risk_txn_ratio': np.random.beta(1, 9, n_samples),
+        'is_high_velocity': np.random.choice([True, False], n_samples, p=[0.1, 0.9]),
+        'is_geo_diverse': np.random.choice([True, False], n_samples, p=[0.05, 0.95]),
+        'has_high_risk_mcc': np.random.choice([True, False], n_samples, p=[0.15, 0.85])
+    }
+    
+    df = pd.DataFrame(data)
+    
+    # Generate fraud labels
+    fraud_prob = (
+        0.3 * df['velocity_score'] +
+        0.2 * df['geo_diversity_score'] + 
+        0.2 * df['high_risk_txn_ratio'] +
+        0.1 * df['is_high_velocity'].astype(float) +
+        0.1 * df['has_high_risk_mcc'].astype(float) +
+        0.1 * np.random.random(n_samples)
+    )
+    
+    # Set fraud threshold to achieve target rate
+    fraud_threshold = np.quantile(fraud_prob, 1 - fraud_rate)
+    is_fraud = fraud_prob >= fraud_threshold
+    
+    logger.info(f"Synthetic dataset created: fraud rate = {is_fraud.mean():.2%}")
+    
+    return df, pd.Series(is_fraud)

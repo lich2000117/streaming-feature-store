@@ -1,0 +1,33 @@
+# ML Framework
+scikit-learn==1.4.0
+xgboost==2.0.3
+lightgbm==4.3.0
+
+# MLflow for experiment tracking and model registry
+mlflow==2.10.2
+
+# Model serving
+onnxmltools==1.12.0
+skl2onnx==1.16.0
+onnxruntime==1.22.1
+
+# Data processing
+pandas==2.1.4
+numpy>=1.26.0,<2.0
+pyarrow==15.0.0
+
+# Feature store integration
+redis==6.4.0
+
+# Model evaluation and validation
+scikit-plot==0.3.7
+
+# Configuration and utilities
+pydantic==2.5.2
+click==8.1.7
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Monitoring and drift detection
+evidently==0.4.12
+alibi-detect==0.12.0
