@@ -40,47 +40,117 @@ Generators    Schema Registry  Features  Online Store  ONNX Models
 ### Prerequisites
 - Docker & Docker Compose
 - Python 3.9+
-- Java 11+ (for Flink)
 
-### 1. Start Infrastructure
+### 1️⃣ **Setup Environment**
 ```bash
+# Create and activate virtual environment
+python3 -m venv .venv
+source .venv/bin/activate
+
+# Install dependencies
+make install
+```
+
+### 2️⃣ **Start Kafka Infrastructure**
+```bash
+# Start Redpanda (Kafka), Schema Registry, Redis
 make up
-```
-This starts: Redpanda, Schema Registry, Flink, Redis, MLflow, Prometheus, Grafana
 
-### 2. Generate Synthetic Data
+# Verify services are running
+docker ps
+# Should see: redpanda, schema-registry, redis
+```
+
+### 3️⃣ **Generate Streaming Data**
 ```bash
+# Test generators first (optional)
+make test-generators
+
+# Start transaction and click event generators
 make seed
+# This runs in background, generating ~25 events/sec
 ```
-Starts transaction and clickstream event generators
 
-### 3. Run Feature Engineering
+### 4️⃣ **Start Stream Processing**
 ```bash
+# Option A: Simplified processor (recommended for learning)
 make run-features
+
+# Option B: Test without Kafka (for development)
+make test-features
 ```
-Submits Flink job for real-time feature computation
 
-### 4. Train Models
+### 5️⃣ **Verify Everything Works**
 ```bash
-make train
+# Check that features are being computed
+redis-cli KEYS "features:*"
+
+# View sample features
+redis-cli GET "features:card:card_00001234"
+
+# Check Kafka topics
+docker exec -it $(docker ps -q -f "ancestor=docker.redpanda.com/redpandadata/redpanda") \
+  rpk topic list
 ```
-Trains fraud detection model and logs to MLflow
 
-### 5. Start Inference Service
+## 🔧 **Step-by-Step Debugging**
+
+### **If Kafka/Redpanda issues:**
 ```bash
-make serve
+# Check logs
+docker logs $(docker ps -q -f "ancestor=docker.redpanda.com/redpandadata/redpanda")
+
+# Restart services
+make down && make up
 ```
-Launches FastAPI service on http://localhost:8080
 
-### 6. Test End-to-End
+### **If generator issues:**
 ```bash
-# Score a transaction
-curl -X POST http://localhost:8080/score \
-  -H "Content-Type: application/json" \
-  -d '{"card_id": "card_12345", "amount": 250.00}'
+# Test generators locally first
+python generators/test_generators.py
 
-# Run load tests
-make test-latency
+# Run single generator manually
+source .venv/bin/activate
+python generators/txgen.py --events-per-second 5 --duration 60
+```
+
+### **If stream processor issues:**
+```bash
+# Test processor without Kafka
+python flink/test_stream_processor.py
+
+# Run with debug logging
+python flink/stream_processor.py --verbose
+```
+
+### **Quick Services Check:**
+```bash
+# Port checklist:
+# 9092  - Kafka/Redpanda ✓
+# 8081  - Schema Registry ✓  
+# 6379  - Redis ✓
+# 8088  - Stream Processor Metrics ✓
+
+netstat -an | grep -E "(9092|8081|6379|8088)"
+```
+
+## 📊 **One-Line Commands (Copy & Paste)**
+
+```bash
+# 🚀 Complete Setup (5 minutes)
+make up && make install && make test-generators && make seed
+
+# 🧪 Quick Test Everything  
+make test-features && redis-cli KEYS "features:*" | head -5
+
+# 🔧 Start Streaming Pipeline
+make run-features  # Simplified processor (recommended for learning)
+
+# 📋 View Live Features
+redis-cli GET "features:card:card_00001234:transaction" | jq .
+
+# 🔍 Monitor Events
+docker exec -it $(docker ps -q -f name=redpanda) rpk topic consume txn.events --num 5
 ```
 
 ## 📊 Monitoring

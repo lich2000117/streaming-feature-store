@@ -29,6 +29,9 @@ test-features: ## test feature engineering pipeline
 test-schemas: ## validate avro schemas
 	source .venv/bin/activate && python schemas/validate_schemas.py
 
+test-feast: ## test feast feature store configuration
+	source .venv/bin/activate && python feast/test_feast_integration.py
+
 test-latency: ## run load tests
 	k6 run loadtest/k6_inference_test.js
 
@@ -45,7 +48,8 @@ venv:     ## create virtual environment
 install:  ## install dependencies
 	source .venv/bin/activate && pip install -r generators/requirements.txt
 	source .venv/bin/activate && pip install -r schemas/requirements.txt  
-	source .venv/bin/activate && pip install redis prometheus-client structlog
+	source .venv/bin/activate && pip install redis prometheus-client structlog pyyaml
+	# Note: Skip Feast installation for now (requires additional system dependencies)
 
 clean:    ## cleanup
 	docker compose -f infra/docker-compose.yml down -v
