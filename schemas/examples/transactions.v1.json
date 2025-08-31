@@ -1,17 +1,17 @@
 {
-  "txn_id": "ebec889a",
-  "card_id": "ccf48125",
-  "user_id": "3c26bb54",
+  "txn_id": "dd238b93",
+  "card_id": "5d759d55",
+  "user_id": "134dd198",
   "amount": 129.99,
   "currency": "USD",
   "mcc": "example_mcc",
-  "device_id": "ffeea138",
+  "device_id": "27f1bf2d",
   "ip_address": "192.168.1.100",
   "geo_country": null,
   "geo_city": null,
   "geo_lat": null,
   "geo_lon": null,
-  "timestamp": 1756355338640,
+  "timestamp": 1756613707309,
   "processing_time": null,
   "metadata": {}
 }

@@ -17,7 +17,7 @@ numpy>=1.26.0,<2.0
 pyarrow==15.0.0
 
 # Feature store integration
-redis==6.4.0
+redis==5.2.0
 
 # Model evaluation and validation
 scikit-plot==0.3.7

@@ -1,8 +1,10 @@
 # Apache Flink for stream processing
-apache-flink==1.19.1
+# Note: PyFlink has complex system dependencies. Install separately if needed:
+# pip install apache-flink==1.19.1
+# apache-flink==1.19.1
 
-# Kafka connectors
-apache-flink-libraries==1.19.1
+# Kafka connectors  
+# apache-flink-libraries==1.19.1
 
 # Redis client for feature store
 redis==5.2.0
@@ -14,6 +16,9 @@ numpy>=1.26.0,<2.0
 # Serialization
 avro-python3==1.10.2
 fastavro==1.10.0
+
+# Kafka client
+kafka-python-ng==2.2.3
 
 # Configuration and utilities
 pydantic==2.5.2

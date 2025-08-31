@@ -14,3 +14,6 @@ pydantic==2.5.2
 # Geo/IP utilities
 geoip2==4.7.0
 requests==2.31.0
+
+# Schema serialization
+avro-python3==1.10.2

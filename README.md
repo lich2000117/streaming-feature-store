@@ -28,69 +28,61 @@ Generators    Schema Registry  Features  Online Store  ONNX Models
 ```
 
 ### Technology Stack
-- **Streaming**: Kafka/Redpanda + Apache Flink
-- **Feature Store**: Feast with Redis online store
-- **ML Pipeline**: MLflow + ONNX for model serving
+- **Streaming**: Kafka/Redpanda + Containerized Stream Processing
+- **Feature Store**: Redis online store with Feast-compatible API
+- **ML Pipeline**: MLflow + ONNX for model serving  
 - **API**: FastAPI with async Redis client
-- **Observability**: Prometheus + Grafana
-- **Orchestration**: Docker Compose (local) + Kubernetes (production)
+- **Observability**: Prometheus + Grafana + structured logging
+- **Orchestration**: Docker Compose with microservices architecture
 
 ## 🚀 Quick Start
 
 ### Prerequisites
 - Docker & Docker Compose
-- Python 3.9+
+- curl & jq (for testing)
 
-### 1️⃣ **Setup Environment**
+### **⚡ One-Command Demo (30 seconds)**
 ```bash
-# Create and activate virtual environment
-python3 -m venv .venv
-source .venv/bin/activate
-
-# Install dependencies
-make install
+make demo
 ```
 
-### 2️⃣ **Start Kafka Infrastructure**
+### **🧪 Test Immediately**
 ```bash
-# Start Redpanda (Kafka), Schema Registry, Redis
-make up
+# Test fraud detection & personalization APIs
+make test
 
-# Verify services are running
-docker ps
-# Should see: redpanda, schema-registry, redis
+# Expected response:
+# {
+#   "score": 0.2,
+#   "model_version": "rule-based-v1", 
+#   "latency_ms": 15.4,
+#   "features_used": 6
+# }
 ```
 
-### 3️⃣ **Generate Streaming Data**
+### **🔍 Verify Everything Works**
 ```bash
-# Test generators first (optional)
-make test-generators
+# Check service health
+make health
 
-# Start transaction and click event generators
-make seed
-# This runs in background, generating ~25 events/sec
+# View live data flow
+make inspect
+
+# Monitor service logs
+make logs
 ```
 
-### 4️⃣ **Start Stream Processing**
+## 🎬 **Live Demo**
+
+See **[DEMO.md](DEMO.md)** for step-by-step demonstration guide.
+
+**Key Demo Commands:**
 ```bash
-# Option A: Simplified processor (recommended for learning)
-make run-features
-
-# Option B: Test without Kafka (for development)
-make test-features
-```
-
-### 5️⃣ **Verify Everything Works**
-```bash
-# Check that features are being computed
-redis-cli KEYS "features:*"
-
-# View sample features
-redis-cli GET "features:card:card_00001234"
-
-# Check Kafka topics
-docker exec -it $(docker ps -q -f "ancestor=docker.redpanda.com/redpandadata/redpanda") \
-  rpk topic list
+make demo           # Complete setup  
+make generate       # Start event generators
+make stream         # Start feature computation
+make test           # Test inference API
+make monitor        # View dashboards
 ```
 
 ## 🔧 **Step-by-Step Debugging**
@@ -165,30 +157,57 @@ docker exec -it $(docker ps -q -f name=redpanda) rpk topic consume txn.events --
 ### Project Structure
 ```
 streaming-feature-store/
-├─ infra/                   # Infrastructure as code
-│  ├─ docker-compose.yml    # Local development stack
-│  └─ k8s/                 # Kubernetes manifests
-├─ schemas/                # Avro/Protobuf data contracts
-├─ generators/             # Event simulators
-├─ flink/                  # Stream processing jobs
-├─ feast/                  # Feature store configuration
-├─ ml/                     # Model training pipeline
-├─ services/inference/     # FastAPI service
-├─ loadtest/              # Performance testing
-└─ docs/                  # Architecture documentation
+├─ generators/                  # Event generation service
+│  ├─ Dockerfile
+│  ├─ requirements.txt
+│  ├─ txgen.py, clickgen.py
+│  └─ test_generators.py
+├─ streaming/                   # Stream processing service
+│  ├─ Dockerfile  
+│  ├─ requirements.txt
+│  ├─ simple/stream_processor.py
+│  └─ core/processors/
+├─ inference/                   # FastAPI scoring service
+│  ├─ Dockerfile
+│  ├─ requirements.txt
+│  └─ app.py
+├─ training/                    # ML training service
+│  ├─ Dockerfile
+│  ├─ requirements.txt
+│  ├─ train.py
+│  └─ models/
+├─ feast/                       # Feature store service
+│  ├─ Dockerfile
+│  ├─ requirements.txt
+│  └─ feature_store.yaml
+├─ schemas/                     # Shared data contracts  
+├─ monitoring/                  # Observability configs
+├─ infra/docker-compose.yml     # Service orchestration
+├─ DEMO.md                      # Live demo guide
+└─ Makefile                     # Simple commands
 ```
 
-### Key Commands
+### Key Commands  
 ```bash
-make up            # Start all infrastructure
-make down          # Stop infrastructure
-make seed          # Start event generators
-make run-features  # Submit Flink job
-make train         # Train ML models
+# === CORE OPERATIONS ===
+make demo          # Complete demo setup
+make up-all        # Start all services  
+make down          # Stop all services
+make status        # Show service status
+
+# === SERVICE MANAGEMENT ===
+make generate      # Start event generators
+make stream        # Start stream processor
 make serve         # Start inference API
-make test-latency  # Run load tests
-make drift-check   # Check for data drift
-make replay        # Replay DLQ events
+make train         # Run training job
+make feast         # Start feature store
+
+# === TESTING & MONITORING ===
+make test          # Test inference endpoints
+make health        # Check service health
+make inspect       # View data flow
+make logs          # View service logs
+make monitor       # Access monitoring dashboards
 ```
 
 ## 🎯 Performance Targets

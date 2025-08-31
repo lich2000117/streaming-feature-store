@@ -694,3 +694,12 @@ assert features['txn_count_5m'] == 1
 ## Python Abstract Learnt
 
 python can have two classes inherited, the order matters (both define functions, the one goes first gets executed)
+
+
+Interview Story:
+> "I designed this as a microservices platform from day one. Each service - event generation, stream processing, inference, and training - runs in its own container with isolated dependencies. The architecture maps directly to cloud services like ECS or Cloud Run, and I can scale each component independently based on load."
+Key Differentiators:
+🔥 Sub-150ms inference with real-time features
+🔥 Production-grade observability (Prometheus, Grafana)
+🔥 One-command demo showing complete workflow
+🔥 Cloud-portable containers ready for any platform

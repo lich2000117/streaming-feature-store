@@ -1,0 +1,52 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Kafka/RedPanda metrics (if enabled)
+  - job_name: 'kafka'
+    static_configs:
+      - targets: ['kafka:9644']  # RedPanda admin API
+    scrape_interval: 30s
+
+  # Redis metrics (if redis_exporter is added)
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis:6379']
+    scrape_interval: 30s
+    metrics_path: /metrics
+
+  # Application metrics (when implemented)
+  - job_name: 'inference-api'
+    static_configs:
+      - targets: ['inference-api:8080']
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  - job_name: 'stream-processor'
+    static_configs:
+      - targets: ['stream-processor:8000']  # Assuming metrics endpoint
+    metrics_path: /metrics
+    scrape_interval: 15s
+
+  # MLflow metrics
+  - job_name: 'mlflow'
+    static_configs:
+      - targets: ['mlflow:5000']
+    metrics_path: /metrics
+    scrape_interval: 30s
+
+rule_files:
+  # Add alerting rules here when needed
+  # - "alerts.yml"
+
+# Configure alertmanager if needed
+# alerting:
+#   alertmanagers:
+#     - static_configs:
+#         - targets: ['alertmanager:9093']

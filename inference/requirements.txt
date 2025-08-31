@@ -1,0 +1,20 @@
+# FastAPI Inference Service
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.2
+
+# Redis client for feature store
+redis==5.2.0
+
+# Model serving
+onnxruntime==1.22.1
+
+# Utilities
+python-dotenv==1.0.0
+structlog==24.1.0
+
+# Monitoring
+prometheus-client==0.21.0
+
+# Schema handling
+avro-python3==1.10.2
