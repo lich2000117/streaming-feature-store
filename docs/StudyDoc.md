@@ -703,3 +703,9 @@ Key Differentiators:
 🔥 Production-grade observability (Prometheus, Grafana)
 🔥 One-command demo showing complete workflow
 🔥 Cloud-portable containers ready for any platform
+
+
+
+## Microservices
+
+Each service has theri own dockerfile and requirements, use docker compose and make file to orchestrate

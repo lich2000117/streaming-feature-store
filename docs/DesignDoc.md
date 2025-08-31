@@ -1,7 +1,6 @@
 
 # Project: Streaming Feature Store & Online Inference (Fraud + Personalisation)
 
-IMPORTANT: the repo will be uploaded to github repo as my personal portfolio, so the code needs to be best practice, senior, no Emoji
 
 ## 0) Why this wins (ROI)
 
@@ -11,7 +10,7 @@ IMPORTANT: the repo will be uploaded to github repo as my personal portfolio, so
 
 ---
 
-## 1) Business framing (you’ll say this in your README/interviews)
+## 1) Business framing
 
 * **Use cases**:
 
@@ -22,7 +21,7 @@ IMPORTANT: the repo will be uploaded to github repo as my personal portfolio, so
 
 ---
 
-## 2) Success criteria (SLOs you will meet)
+## 2) Success criteria
 
 * **Throughput**: ≥ 5k events/sec locally; document how to scale to 50k+.
 * **Latency**: end-to-end (event → score) **p95 ≤ 150 ms**.
@@ -49,7 +48,7 @@ Cloud mapping (documented):
 
 ---
 
-## 4) Data contracts & topics (critical senior bit)
+## 4) Data contracts & topics 
 
 **Contracts (Avro/Protobuf)** with backward-compatible evolution:
 
@@ -125,46 +124,12 @@ Cloud mapping (documented):
 
 ---
 
-## 9) Reliability & replay story (the interview-killer feature)
+## 9) Reliability & replay story
 
 * **Exactly-once**: Flink checkpoints + transactional/commit sinks to Feast/Redis (or idempotent `SET` with versioned timestamps).
 * **Backfill**: From Parquet to online store with time fences so you don’t pollute freshness.
 * **Disaster drill**: nuke Redis; **rebuild features** from compacted topics + offline logs with a single command.
 
----
-
-## 10) Repository layout (clean & “hire-me” ready)
-
-```
-streaming-feature-store/
-├─ infra/
-│  ├─ docker-compose.yml        # Kafka/Redpanda, Schema Registry, Flink, Redis, Prometheus, Grafana, MLflow, Feast
-│  ├─ grafana/                  # dashboards: lag, latency, drift
-│  └─ k8s/                      # optional manifests (Flink job, API, Redis)
-├─ schemas/                     # Avro/Proto + data contracts README
-├─ generators/                  # transaction + click simulators
-├─ flink/
-│  ├─ jobs/feature_job.py       # windows/joins/TTL, DLQ, Feast sink
-│  └─ utils/                    # serialization, watermarks, schema handling
-├─ feast/
-│  ├─ feature_store.yaml
-│  ├─ registry.db               # generated
-│  └─ feature_views/            # definitions
-├─ ml/
-│  ├─ train.ipynb               # offline training/eval
-│  ├─ requirements.txt
-│  └─ models/                   # ONNX, MLflow artifacts (ignored by git if large)
-├─ services/inference/
-│  ├─ app.py                    # FastAPI service
-│  ├─ onnx_loader.py
-│  └─ requirements.txt
-├─ loadtest/
-│  └─ k6/locust scripts         # latency + throughput tests
-├─ docs/
-│  ├─ architecture.md           # diagram + decisions
-│  └─ runbook.md                # replay, DLQ, scale, evolution
-└─ README.md                    # story, commands, screenshots, metrics table
-```
 
 ---
 
@@ -181,7 +146,7 @@ streaming-feature-store/
 
 ---
 
-## 12) What you’ll screenshot in the README
+## 12) What screenshot in the README
 
 * Grafana panel: **consumer lag \~0**, **Flink p95 < 50 ms**, API **p95 < 150 ms**.
 * Feast materialization logs + point-in-time validation output.
@@ -191,35 +156,9 @@ streaming-feature-store/
 
 ---
 
-## 13) Resume bullets unlocked (you can copy-paste later)
-
-* Built a **Kafka→Flink→Feast(Redis)** online feature store with **exactly-once** semantics and replay; **p95 scoring 120 ms** at 5k eps; consumer lag monitoring and DLQ with automated replay.
-* Delivered **point-in-time correct** features shared by batch + online; versioned models in **MLflow/ONNX** with **A/B canary** rollout and **drift alerts** (PSI).
-* Implemented **schema evolution** (Avro) and data contracts; documented **recovery runbook** and cost/scale trade-offs.
-
----
-
-## 14) Critical trims if time is tight (still senior-looking)
-
-* Use **Redpanda** for simpler local Kafka.
-* Skip Feast; write a tiny **feature KV layer** on Redis with versioned timestamps (document how Feast would replace it).
-* Use **ksqlDB** for a subset of features to show tool breadth.
-
----
-
-## 15) Stretch AI pieces (optional, only if you have time)
-
-* **Re-ranking** service (embeddings for last-N items) with a vector index; compare vs non-personalised baseline.
-* **LLM explainer**: small local model to generate reason codes for flagged fraud; guardrails + cost budget.
-
----
-
-If you follow this blueprint, you’ll have a repo that screams **“senior, production-minded, AI-ready”**. If you want, I can adapt this to a **minimal first milestone** (exact file stubs + a day-by-day checklist) so you can start committing today.
 
 
-
-
-Yes—that’s exactly the point. Built the way I outlined, it’s:
+It’s:
 
 * **Pure local + easy to run** (Docker Compose): Redpanda/Kafka, Schema Registry, Flink, Redis/Feast, MLflow, FastAPI, Prometheus/Grafana. One command to bring it up, one to seed events, one to submit the Flink job.
 * **Deep-under-the-hood learning**: you’ll touch partitions/keys, watermarks, state (RocksDB), checkpointing, exactly-once sinks, schema evolution, DLQs, replay, feature freshness—the real machinery senior interviews probe on.
@@ -267,11 +206,10 @@ It’s the **same bones**: contracts → streaming features → online store →
 * **Replay**: wipe Redis, rebuild from compacted topics + offline logs; measure time to recovery.
 * **SLOs**: document p95 for API, consumer lag, end-to-end latency; show dashboards.
 
-### Minimal conversion steps (when you’re ready)
+### Minimal conversion steps
 
 1. **Lift compute**: containerize Flink job and inference service → deploy to Cloud Run/ECS/Fargate first (simplest).
 2. **Swap data plane**: Kafka → Pub/Sub/MSK; update client libs + credentials; keep schemas.
 3. **Swap stores**: local Parquet → S3/GCS; Redis → ElastiCache/Memorystore.
 4. **Plug observability**: export Prometheus metrics to Managed Grafana/CloudWatch/Cloud Monitoring.
 
-If you build the local version exactly like this, you’ll both understand the guts **and** have a clean story for “how I’d productionize this on AWS/GCP.” That’s the highest ROI: it reads senior, it’s portable, and you can re-target it to logs, clickstream, payments, or IoT with just schema/feature tweaks.
