@@ -58,20 +58,21 @@ scrape_configs:
 
   # === APPLICATION MONITORING ===
 
-  # FastAPI Inference Service - Primary service (disabled - not currently running)
-  # - job_name: 'inference-api'
-  #   static_configs:
-  #     - targets: ['inference-api:8080']
-  #   metrics_path: /metrics
-  #   scrape_interval: 10s  # High frequency for real-time monitoring
-  #   scrape_timeout: 5s
-  #   relabel_configs:
-  #     - source_labels: [__address__]
-  #       target_label: service
-  #       replacement: 'inference-api'
-  #     - source_labels: [__address__]
-  #       target_label: component
-  #       replacement: 'ml-serving'
+  # FastAPI Inference Service - Primary service
+  - job_name: 'inference-api'
+    static_configs:
+      - targets: ['inference-api:8080']
+    metrics_path: /metrics
+    scrape_interval: 10s  # High frequency for real-time monitoring
+    scrape_timeout: 5s
+    honor_labels: true  # Keep original labels from the target
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'inference-api'
+      - source_labels: [__address__]
+        target_label: component
+        replacement: 'ml-serving'
 
   # Stream Processing Service
   - job_name: 'stream-processor'
@@ -117,13 +118,13 @@ scrape_configs:
   #       target_label: component
   #       replacement: 'ml-lifecycle'
 
-  # Feast Feature Store (disabled - not currently running)
-  # - job_name: 'feast-server'
-  #   static_configs:
-  #     - targets: ['feast-server:6566']
-  #   metrics_path: /metrics
-  #   scrape_interval: 30s
-  #   honor_labels: true
+  # Feast Feature Store
+  - job_name: 'feast-server'
+    static_configs:
+      - targets: ['feast-server:6566']
+    metrics_path: /metrics
+    scrape_interval: 30s
+    honor_labels: true
 
   # Training Job metrics (disabled - training jobs are batch jobs, not long-running services)
   # - job_name: 'training-jobs'
@@ -135,13 +136,13 @@ scrape_configs:
 
   # === BUSINESS METRICS ===
   
-  # Custom business metrics endpoint (disabled - inference-api not running)
-  # - job_name: 'business-metrics'
-  #   static_configs:
-  #     - targets: ['inference-api:8080']
-  #   metrics_path: /business-metrics
-  #   scrape_interval: 60s
-  #   honor_labels: true
+  # Custom business metrics endpoint
+  - job_name: 'business-metrics'
+    static_configs:
+      - targets: ['inference-api:8080']
+    metrics_path: /business-metrics
+    scrape_interval: 60s
+    honor_labels: true
 
   # === EXTERNAL MONITORING ===
 
@@ -152,8 +153,9 @@ scrape_configs:
       module: [http_2xx]
     static_configs:
       - targets:
-        # - http://inference-api:8080/health  # Disabled - not running
-        # - http://inference-api:8080/ready   # Disabled - not running
+        - http://inference-api:8080/health
+        - http://inference-api:8080/ready
+        - http://inference-api:8080/metrics
         - http://mlflow:5001
     relabel_configs:
       - source_labels: [__address__]

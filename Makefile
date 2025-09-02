@@ -28,7 +28,8 @@ train:      ## Run ML training pipeline (with MLflow)
 	docker compose -f infra/docker-compose.yml up training-job --build
 
 monitor:    ## Start monitoring stack (prometheus, grafana)
-	docker compose -f infra/docker-compose.yml --profile monitoring up -d
+	docker compose -f infra/docker-compose.yml --profile monitoring restart
+
 
 # === OBSERVABILITY ===
 logs-check:       ## View all service logs

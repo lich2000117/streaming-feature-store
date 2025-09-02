@@ -15,12 +15,12 @@ import uuid
 import logging
 from datetime import datetime
 from contextlib import asynccontextmanager
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List, Union
 
 import structlog
 from fastapi import FastAPI, HTTPException, Request, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import Response
+from fastapi.responses import Response, JSONResponse
 from fastapi.exceptions import RequestValidationError
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 
@@ -48,14 +48,13 @@ structlog.configure(
     logger_factory=structlog.stdlib.LoggerFactory(),
     cache_logger_on_first_use=True,
 )
-
 logger = structlog.get_logger()
 
 # Global state
 config: Optional[InferenceConfig] = None
 feature_client: Optional[FeatureStoreClient] = None
 model_manager: Optional[ModelManager] = None
-service_start_time = time.time()
+service_start_time = time.perf_counter()
 
 # Prometheus metrics
 REQUEST_COUNT = Counter(
@@ -96,47 +95,48 @@ ERROR_COUNT = Counter(
 async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown."""
     global config, feature_client, model_manager
-    
-    # Startup
+
     logger.info("Starting Streaming Feature Store Inference Service")
-    
     try:
-        # Load configuration
         config = InferenceConfig.from_env()
-        logger.info("Configuration loaded", environment=config.environment)
-        
-        # Validate model paths
-        if not config.validate_paths():
+        logger.info("Configuration loaded", environment=getattr(config, "environment", "unknown"))
+
+        if hasattr(config, "validate_paths") and not config.validate_paths():
             raise ValueError("Required model files not found")
-        
-        # Initialize feature store client
+
         feature_client = FeatureStoreClient(config)
         logger.info("Feature store client initialized")
-        
-        # Initialize model manager
+
         model_manager = ModelManager(config)
         logger.info("Model manager initialized")
-        
-        # Test components
-        if not feature_client.health_check():
-            logger.warning("Feature store health check failed")
-        
-        model_info = model_manager.get_model_info()
+
+        # Optional sanity checks
+        try:
+            _ = feature_client.health_check()
+        except Exception as e:
+            logger.warning("Feature store health check failed", error=str(e))
+
+        try:
+            model_info = model_manager.get_model_info()
+        except Exception as e:
+            logger.warning("Model info retrieval failed", error=str(e))
+            model_info = {}
+
         logger.info("Service startup completed", model_info=model_info)
-        
     except Exception as e:
         logger.error("Service startup failed", error=str(e))
         raise
-    
-    yield
-    
-    # Shutdown
-    logger.info("Shutting down inference service")
-    
-    if feature_client:
-        feature_client.close()
 
-    logger.info("Service shutdown completed")
+    try:
+        yield
+    finally:
+        logger.info("Shutting down inference service")
+        if feature_client:
+            try:
+                feature_client.close()
+            except Exception as e:
+                logger.warning("Feature client close failed", error=str(e))
+        logger.info("Service shutdown completed")
 
 
 # Initialize FastAPI app
@@ -149,121 +149,97 @@ app = FastAPI(
     redoc_url="/redoc"
 )
 
-# Add CORS middleware
+# Add CORS middleware (adjust origins for production)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
-    allow_credentials=True,
+    allow_origins=["*"],            # In prod, set explicit origins
+    allow_credentials=False,        # "*" + credentials is invalid; set False here
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+def _now() -> datetime:
+    return datetime.now()
+
+
 @app.middleware("http")
 async def request_middleware(request: Request, call_next):
     """Request middleware for logging, timing, and metrics."""
-    start_time = time.time()
+    start_time = time.perf_counter()
     request_id = str(uuid.uuid4())
-    
-    # Add request ID to context
     request.state.request_id = request_id
-    
-    # Increment active requests
+
     ACTIVE_REQUESTS.inc()
-    
-    # Log request start
-    logger.info(
-        "Request started",
-        request_id=request_id,
-        method=request.method,
-        path=request.url.path,
-        client_ip=request.client.host
-    )
-    
+
+    method = request.method
+    path = request.url.path
+    status_code: int = 500
+    response: Optional[Response] = None
+
+    logger.info("Request started", request_id=request_id, method=method, path=path, client_ip=getattr(request.client, "host", "unknown"))
+
     try:
         response = await call_next(request)
         status_code = response.status_code
-        
+        return response
     except Exception as e:
-        logger.error(
-            "Request failed with exception",
-            request_id=request_id,
-            error=str(e)
-        )
-        status_code = 500
+        ERROR_COUNT.labels(error_type="unhandled", endpoint=path).inc()
+        logger.exception("Request failed with exception", request_id=request_id, error=str(e))
+        # Re-raise so registered exception handlers can format the response.
         raise
-    
     finally:
-        # Decrement active requests
         ACTIVE_REQUESTS.dec()
-        
-        # Calculate duration
-        duration = time.time() - start_time
-        
-        # Record metrics
-        REQUEST_COUNT.labels(
-            method=request.method,
-            endpoint=request.url.path,
-            status=status_code
-        ).inc()
-        
-        REQUEST_DURATION.labels(endpoint=request.url.path).observe(duration)
-        
-        # Log request completion
-        logger.info(
-            "Request completed",
-            request_id=request_id,
-            status_code=status_code,
-            duration_ms=duration * 1000
-        )
-        
-        # Add timing header
-        response.headers["X-Request-ID"] = request_id
-        response.headers["X-Process-Time"] = str(duration)
-    
-    return response
+        duration = time.perf_counter() - start_time
 
+        # Prometheus expects label values as strings
+        REQUEST_COUNT.labels(method=method, endpoint=path, status=str(status_code)).inc()
+        REQUEST_DURATION.labels(endpoint=path).observe(duration)
+
+        logger.info("Request completed", request_id=request_id, status_code=status_code, duration_ms=duration * 1000.0)
+
+        # Only set headers if we actually have a response object
+        if response is not None:
+            response.headers["X-Request-ID"] = request_id
+            response.headers["X-Process-Time"] = f"{duration:.6f}"
+
+
+# === Exception Handlers ===
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
-    """Handle request validation errors."""
+    """Handle request validation errors (422)."""
     request_id = getattr(request.state, 'request_id', 'unknown')
-    
     ERROR_COUNT.labels(error_type="validation", endpoint=request.url.path).inc()
-    
-    logger.warning(
-        "Request validation failed",
-        request_id=request_id,
-        errors=exc.errors()
-    )
-    
+
+    logger.warning("Request validation failed", request_id=request_id, errors=exc.errors())
+
     error_detail = ErrorDetail(
         error_code="VALIDATION_ERROR",
         error_message=f"Request validation failed: {exc.errors()}",
         error_type="validation",
-        timestamp=datetime.now(),
+        timestamp=_now(),
         request_id=request_id
     )
-    
-    return ErrorResponse(error=error_detail)
+    payload = ErrorResponse(error=error_detail)
+    return JSONResponse(status_code=422, content=payload.model_dump())
 
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
-    """Handle HTTP exceptions."""
+    """Handle HTTP exceptions (uses given status)."""
     request_id = getattr(request.state, 'request_id', 'unknown')
-    
     ERROR_COUNT.labels(error_type="http", endpoint=request.url.path).inc()
-    
+
     error_detail = ErrorDetail(
         error_code=f"HTTP_{exc.status_code}",
-        error_message=exc.detail,
+        error_message=str(exc.detail),
         error_type="http",
-        timestamp=datetime.now(),
+        timestamp=_now(),
         request_id=request_id
     )
-    
-    return ErrorResponse(error=error_detail)
+    payload = ErrorResponse(error=error_detail)
+    return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
 
 
 def get_request_id(request: Request) -> str:
@@ -277,32 +253,31 @@ def get_request_id(request: Request) -> str:
 async def health_check():
     """Comprehensive health check endpoint."""
     try:
-        # Check Redis connection
         redis_healthy = feature_client.health_check() if feature_client else False
-        
-        # Check model status
+
         model_healthy = model_manager is not None
         if model_manager:
             try:
-                model_info = model_manager.get_model_info()
+                _ = model_manager.get_model_info()
                 model_healthy = True
             except Exception:
                 model_healthy = False
-        
-        # Calculate uptime
-        uptime_seconds = time.time() - service_start_time
-        
-        # Get cache stats
-        cache_stats = feature_client.get_cache_stats() if feature_client else {}
-        
-        # Determine overall health
+
+        uptime_seconds = time.perf_counter() - service_start_time
+
+        cache_stats: Dict[str, Any] = {}
+        try:
+            cache_stats = feature_client.get_cache_stats() if feature_client else {}
+        except Exception:
+            cache_stats = {}
+
         if redis_healthy and model_healthy:
             status = HealthStatus.HEALTHY
         elif model_healthy:
             status = HealthStatus.DEGRADED
         else:
             status = HealthStatus.UNHEALTHY
-        
+
         components = {
             "redis": {
                 "status": "healthy" if redis_healthy else "unhealthy",
@@ -313,18 +288,17 @@ async def health_check():
                 "loaded_models": model_manager.list_models() if model_manager else []
             }
         }
-        
+
         return HealthResponse(
             status=status,
-            timestamp=datetime.now(),
-            version=config.api.version if config else "unknown",
+            timestamp=_now(),
+            version=getattr(getattr(config, "api", None), "version", "unknown"),
             components=components,
             uptime_seconds=uptime_seconds,
-            request_count=0,  # Would come from metrics in production
-            error_rate=0.0,   # Would come from metrics in production
-            avg_latency_ms=0.0  # Would come from metrics in production
+            request_count=0.0,
+            error_rate=0.0,
+            avg_latency_ms=0.0,
         )
-        
     except Exception as e:
         logger.error("Health check failed", error=str(e))
         raise HTTPException(status_code=503, detail="Service unhealthy")
@@ -334,12 +308,16 @@ async def health_check():
 async def readiness_check():
     """Readiness check for load balancer."""
     model_loaded = model_manager is not None
-    redis_connected = feature_client.health_check() if feature_client else False
+    try:
+        redis_connected = feature_client.health_check() if feature_client else False
+    except Exception:
+        redis_connected = False
+
     dependencies_ready = model_loaded and redis_connected
-    
+
     return ReadinessResponse(
         ready=dependencies_ready,
-        timestamp=datetime.now(),
+        timestamp=_now(),
         model_loaded=model_loaded,
         redis_connected=redis_connected,
         dependencies_ready=dependencies_ready
@@ -358,38 +336,29 @@ async def metrics():
 async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_request_id)):
     """
     Real-time fraud detection endpoint.
-    
     Target: p95 latency < 150ms
     """
-    start_time = time.time()
-    
+    start_time = time.perf_counter()
     try:
-        # Fetch features from Redis
-        feature_start = time.time()
+        feature_start = time.perf_counter()
         features, feature_metadata = feature_client.get_card_features(request.card_id)
-        FEATURE_FETCH_DURATION.observe(time.time() - feature_start)
-        
-        # Add transaction context to features
+        FEATURE_FETCH_DURATION.observe(time.perf_counter() - feature_start)
+
         if request.transaction_amount is not None:
             features["transaction_amount"] = request.transaction_amount
         if request.mcc_code:
             features["mcc_code"] = request.mcc_code
-        
-        # Model inference
-        inference_start = time.time()
+
+        inference_start = time.perf_counter()
         prediction_score, model_metadata = model_manager.predict(features)
-        MODEL_INFERENCE_DURATION.observe(time.time() - inference_start)
-        
-        # Record prediction score distribution
+        MODEL_INFERENCE_DURATION.observe(time.perf_counter() - inference_start)
+
         PREDICTION_SCORES.labels(model_type="fraud").observe(prediction_score)
-        
-        # Interpret prediction
+
         interpretation = interpret_fraud_prediction(prediction_score, features, model_metadata)
-        
-        # Calculate total latency
-        latency_ms = (time.time() - start_time) * 1000
-        
-        # Log successful prediction
+
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
+
         logger.info(
             "Fraud score computed",
             request_id=request_id,
@@ -397,34 +366,28 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
             score=prediction_score,
             risk_level=interpretation["risk_level"],
             latency_ms=latency_ms,
-            features_count=feature_metadata.feature_count,
-            cache_hit=feature_metadata.cache_hit
+            features_count=getattr(feature_metadata, "feature_count", len(features)),
+            cache_hit=getattr(feature_metadata, "cache_hit", False),
         )
-        
+
         return FraudScoreResponse(
             request_id=request_id,
-            timestamp=datetime.now(),
+            timestamp=_now(),
             model_version=model_metadata["model_version"],
             latency_ms=latency_ms,
             fraud_score=prediction_score,
             risk_level=interpretation["risk_level"],
             confidence=interpretation["confidence"],
-            features_used=feature_metadata.feature_count,
+            features_used=getattr(feature_metadata, "feature_count", len(features)),
             top_risk_factors=interpretation["top_risk_factors"],
             feature_importance=model_metadata.get("feature_importance"),
             recommended_action=interpretation["recommended_action"],
             explanation=interpretation["explanation"],
-            feature_freshness_sec=feature_metadata.freshness_seconds
+            feature_freshness_sec=getattr(feature_metadata, "freshness_seconds", None),
         )
-        
     except Exception as e:
         ERROR_COUNT.labels(error_type="prediction", endpoint="/score/fraud").inc()
-        logger.error(
-            "Fraud scoring failed",
-            request_id=request_id,
-            card_id=request.card_id,
-            error=str(e)
-        )
+        logger.error("Fraud scoring failed", request_id=request_id, card_id=request.card_id, error=str(e))
         raise HTTPException(status_code=500, detail="Fraud scoring failed")
 
 
@@ -434,37 +397,29 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
 async def score_personalization(request: PersonalizationScoreRequest, request_id: str = Depends(get_request_id)):
     """
     Real-time personalization scoring endpoint.
-    
     Target: p95 latency < 150ms
     """
-    start_time = time.time()
-    
+    start_time = time.perf_counter()
     try:
-        # Fetch features from Redis
-        feature_start = time.time()
+        feature_start = time.perf_counter()
         features, feature_metadata = feature_client.get_user_features(request.user_id)
-        FEATURE_FETCH_DURATION.observe(time.time() - feature_start)
-        
-        # Add context features
+        FEATURE_FETCH_DURATION.observe(time.perf_counter() - feature_start)
+
         if request.item_category:
             features["item_category"] = request.item_category
         if request.item_price is not None:
             features["item_price"] = request.item_price
-        
-        # Model inference (using same model for now, but could be different)
-        inference_start = time.time()
+
+        inference_start = time.perf_counter()
         prediction_score, model_metadata = model_manager.predict(features)
-        MODEL_INFERENCE_DURATION.observe(time.time() - inference_start)
-        
-        # Record prediction score
+        MODEL_INFERENCE_DURATION.observe(time.perf_counter() - inference_start)
+
         PREDICTION_SCORES.labels(model_type="personalization").observe(prediction_score)
-        
-        # Interpret prediction
+
         interpretation = interpret_personalization_prediction(prediction_score, features, model_metadata)
-        
-        # Calculate latency
-        latency_ms = (time.time() - start_time) * 1000
-        
+
+        latency_ms = (time.perf_counter() - start_time) * 1000.0
+
         logger.info(
             "Personalization score computed",
             request_id=request_id,
@@ -472,31 +427,25 @@ async def score_personalization(request: PersonalizationScoreRequest, request_id
             score=prediction_score,
             user_segment=interpretation["user_segment"],
             latency_ms=latency_ms,
-            features_count=feature_metadata.feature_count
+            features_count=getattr(feature_metadata, "feature_count", len(features)),
         )
-        
+
         return PersonalizationScoreResponse(
             request_id=request_id,
-            timestamp=datetime.now(),
+            timestamp=_now(),
             model_version=model_metadata["model_version"],
             latency_ms=latency_ms,
             relevance_score=prediction_score,
-            conversion_probability=prediction_score * 0.8,  # Derived score
+            conversion_probability=prediction_score * 0.8,
             engagement_score=features.get("engagement_score", 0.5),
-            features_used=feature_metadata.feature_count,
+            features_used=getattr(feature_metadata, "feature_count", len(features)),
             user_segment=interpretation["user_segment"],
             behavioral_signals=interpretation["behavioral_signals"],
-            feature_freshness_sec=feature_metadata.freshness_seconds
+            feature_freshness_sec=getattr(feature_metadata, "freshness_seconds", None),
         )
-        
     except Exception as e:
         ERROR_COUNT.labels(error_type="prediction", endpoint="/score/personalization").inc()
-        logger.error(
-            "Personalization scoring failed",
-            request_id=request_id,
-            user_id=request.user_id,
-            error=str(e)
-        )
+        logger.error("Personalization scoring failed", request_id=request_id, user_id=request.user_id, error=str(e))
         raise HTTPException(status_code=500, detail="Personalization scoring failed")
 
 
@@ -505,82 +454,82 @@ async def score_personalization(request: PersonalizationScoreRequest, request_id
 @app.post("/score/batch", response_model=BatchScoreResponse)
 async def score_batch(request: BatchScoreRequest, request_id: str = Depends(get_request_id)):
     """Batch scoring endpoint for multiple requests."""
-    start_time = time.time()
-    
+    start_time = time.perf_counter()
+
     if len(request.requests) > 1000:
         raise HTTPException(status_code=400, detail="Batch size too large (max 1000)")
-    
-    try:
-        responses = []
-        errors = []
-        
-        for i, req in enumerate(request.requests):
-            try:
-                if request.model_type == ModelType.FRAUD_DETECTION:
-                    # Process fraud request
-                    features, _ = feature_client.get_card_features(req.card_id)
-                    prediction_score, metadata = model_manager.predict(features)
-                    interpretation = interpret_fraud_prediction(prediction_score, features, metadata)
-                    
-                    response = FraudScoreResponse(
-                        request_id=f"{request_id}-{i}",
-                        timestamp=datetime.now(),
-                        model_version=metadata["model_version"],
-                        latency_ms=metadata["inference_time_ms"],
-                        fraud_score=prediction_score,
-                        risk_level=interpretation["risk_level"],
-                        confidence=interpretation["confidence"],
-                        features_used=len(features),
-                        top_risk_factors=interpretation["top_risk_factors"],
-                        recommended_action=interpretation["recommended_action"],
-                        explanation=interpretation["explanation"]
-                    )
-                    
-                elif request.model_type == ModelType.PERSONALIZATION:
-                    # Process personalization request
-                    features, _ = feature_client.get_user_features(req.user_id)
-                    prediction_score, metadata = model_manager.predict(features)
-                    interpretation = interpret_personalization_prediction(prediction_score, features, metadata)
-                    
-                    response = PersonalizationScoreResponse(
-                        request_id=f"{request_id}-{i}",
-                        timestamp=datetime.now(),
-                        model_version=metadata["model_version"],
-                        latency_ms=metadata["inference_time_ms"],
-                        relevance_score=prediction_score,
-                        conversion_probability=prediction_score * 0.8,
-                        engagement_score=features.get("engagement_score", 0.5),
-                        features_used=len(features),
-                        user_segment=interpretation["user_segment"],
-                        behavioral_signals=interpretation["behavioral_signals"]
-                    )
-                
-                responses.append(response)
-        
-    except Exception as e:
-                error_detail = {
-                    "request_index": i,
-                    "error": str(e)
-                }
-                errors.append(error_detail)
-        
-        processing_time_ms = (time.time() - start_time) * 1000
-        
-        return BatchScoreResponse(
-            batch_id=request.batch_id,
-            model_type=request.model_type,
-            total_requests=len(request.requests),
-            successful_responses=len(responses),
-            failed_responses=len(errors),
-            responses=responses,
-            errors=errors if errors else None,
-            processing_time_ms=processing_time_ms,
-            timestamp=datetime.now()
-        )
-        
-    except Exception as e:
-        logger.error("Batch scoring failed", request_id=request_id, error=str(e))
-        raise HTTPException(status_code=500, detail="Batch scoring failed")
+
+    responses: List[Union[FraudScoreResponse, PersonalizationScoreResponse]] = []
+    errors: List[Dict[str, Any]] = []
+
+    for i, req in enumerate(request.requests):
+        try:
+            if request.model_type == ModelType.FRAUD_DETECTION:
+                features, feature_metadata = feature_client.get_card_features(req.card_id)
+                s = time.perf_counter()
+                score, meta = model_manager.predict(features)
+                MODEL_INFERENCE_DURATION.observe(time.perf_counter() - s)
+                PREDICTION_SCORES.labels(model_type="fraud").observe(score)
+                interp = interpret_fraud_prediction(score, features, meta)
+
+                responses.append(FraudScoreResponse(
+                    request_id=f"{request_id}-{i}",
+                    timestamp=_now(),
+                    model_version=meta["model_version"],
+                    latency_ms=meta.get("inference_time_ms", 0.0),
+                    fraud_score=score,
+                    risk_level=interp["risk_level"],
+                    confidence=interp["confidence"],
+                    features_used=getattr(feature_metadata, "feature_count", len(features)),
+                    top_risk_factors=interp["top_risk_factors"],
+                    recommended_action=interp["recommended_action"],
+                    explanation=interp["explanation"],
+                    feature_freshness_sec=getattr(feature_metadata, "freshness_seconds", None),
+                ))
+
+            elif request.model_type == ModelType.PERSONALIZATION:
+                features, feature_metadata = feature_client.get_user_features(req.user_id)
+                s = time.perf_counter()
+                score, meta = model_manager.predict(features)
+                MODEL_INFERENCE_DURATION.observe(time.perf_counter() - s)
+                PREDICTION_SCORES.labels(model_type="personalization").observe(score)
+                interp = interpret_personalization_prediction(score, features, meta)
+
+                responses.append(PersonalizationScoreResponse(
+                    request_id=f"{request_id}-{i}",
+                    timestamp=_now(),
+                    model_version=meta["model_version"],
+                    latency_ms=meta.get("inference_time_ms", 0.0),
+                    relevance_score=score,
+                    conversion_probability=score * 0.8,
+                    engagement_score=features.get("engagement_score", 0.5),
+                    features_used=getattr(feature_metadata, "feature_count", len(features)),
+                    user_segment=interp["user_segment"],
+                    behavioral_signals=interp["behavioral_signals"],
+                    feature_freshness_sec=getattr(feature_metadata, "freshness_seconds", None),
+                ))
+            else:
+                raise ValueError(f"Unsupported model_type: {request.model_type}")
+
+        except Exception as e:
+            # Collect per-item error and continue
+            ERROR_COUNT.labels(error_type="prediction", endpoint="/score/batch").inc()
+            logger.error("Batch item failed", request_id=request_id, index=i, error=str(e))
+            errors.append({"request_index": i, "error": str(e)})
+
+    processing_time_ms = (time.perf_counter() - start_time) * 1000.0
+
+    return BatchScoreResponse(
+        batch_id=request.batch_id,
+        model_type=request.model_type,
+        total_requests=len(request.requests),
+        successful_responses=len(responses),
+        failed_responses=len(errors),
+        responses=responses,
+        errors=errors or None,
+        processing_time_ms=processing_time_ms,
+        timestamp=_now(),
+    )
 
 
 # === Utility Endpoints ===
@@ -590,12 +539,11 @@ async def list_models():
     """List available models."""
     if not model_manager:
         raise HTTPException(status_code=503, detail="Model manager not initialized")
-    
-    models = {}
+
+    models: Dict[str, Any] = {}
     for model_name in model_manager.list_models():
-        model_info = model_manager.get_model_info(model_name)
-        models[model_name] = model_info
-    
+        models[model_name] = model_manager.get_model_info(model_name)
+
     return {"models": models}
 
 
@@ -604,7 +552,7 @@ async def root():
     """Root endpoint with service information."""
     return {
         "service": "Streaming Feature Store - Inference API",
-        "version": config.api.version if config else "unknown",
+        "version": getattr(getattr(config, "api", None), "version", "unknown"),
         "status": "healthy",
         "endpoints": {
             "health": "/health",
@@ -612,7 +560,7 @@ async def root():
             "metrics": "/metrics",
             "docs": "/docs",
             "fraud_scoring": "/score/fraud",
-            "personalization": "/score/personalization",
+            "personalization_scoring": "/score/personalization",
             "batch_scoring": "/score/batch"
         }
     }
