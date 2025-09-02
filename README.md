@@ -1,530 +1,442 @@
-# 🚀 Streaming Feature Store & Online Inference
+# Streaming Feature Store & Online Inference
 
-> **Real-time fraud detection and personalization platform** showcasing senior-level data engineering, streaming, and MLOps practices.
+Real-time fraud detection and personalization platform showcasing senior-level data engineering, streaming, and MLOps.
 
-## 🎯 Project Overview
+---
 
-This project demonstrates **end-to-end ownership** of a production-grade streaming data platform:
-- **Ingest** → **Stream Compute** → **Feature Store** → **Model Training** → **Online Inference** → **Monitoring**
+## Overview
 
-### Use Cases
-1. **Fraud Risk Scoring**: Real-time payment transaction analysis (p95 < 150ms)
-2. **Personalization**: User propensity scoring for recommendations
+End-to-end, production-grade streaming platform:
 
-### Key Technical Achievements
-- ⚡ **Sub-150ms p95 latency** for online inference
-- 🔄 **Exactly-once semantics** with replay capabilities
-- 📊 **Point-in-time correct** features (offline/online parity)
-- 📈 **5k+ events/sec** throughput locally
-- 🔍 **Schema evolution** with backward compatibility
-- 📊 **Real-time monitoring** and drift detection
+**Ingest → Stream Compute → Feature Store → Model Training → Online Inference → Monitoring**
 
-## 🏗️ Architecture
+**Use cases**
+- Fraud risk scoring (real-time, sub-150 ms p95)
+- Personalization (user propensity scoring)
+
+**Highlights**
+- Sub-150 ms p95 online inference
+- Exactly-once semantics and replay
+- Point-in-time correct features (offline/online parity)
+- 5k+ events/sec locally
+- Backward-compatible schema evolution
+- Real-time monitoring and drift detection
+
+---
+
+## Architecture
 
 ```
+
 Event Sources → Kafka/Redpanda → Flink → Feast (Redis) → FastAPI → Scoring
-     ↓              ↓              ↓         ↓           ↓
+↓              ↓              ↓         ↓           ↓
 Generators    Schema Registry  Features  Online Store  ONNX Models
-```
 
-### Technology Stack
-- **Streaming**: Kafka/Redpanda + Containerized Stream Processing
-- **Feature Store**: Redis online store with Feast-compatible API
-- **ML Pipeline**: MLflow + ONNX for model serving  
-- **API**: FastAPI with async Redis client
-- **Observability**: Prometheus + Grafana + structured logging
-- **Orchestration**: Docker Compose with microservices architecture
+````
 
-## 🚀 Quick Start
+**Technology stack**
+- Streaming: Kafka/Redpanda + containerized stream processing (Flink / Python)
+- Feature Store: Redis (Feast-compatible API)
+- ML: MLflow + ONNX for serving
+- API: FastAPI with async Redis client
+- Observability: Prometheus + Grafana + structured logging
+- Orchestration: Docker Compose (profiles) + Makefile
 
-### Prerequisites
+---
+
+## Quick Start
+
+**Prerequisites**
 - Docker & Docker Compose
-- curl & jq (for testing)
+- `curl` and `jq` (for testing)
 
-### **⚡ One-Command Demo (30 seconds)**
+**One-command demo (≈30s)**
 ```bash
 make demo
-```
+````
 
-### **🧪 Test Immediately**
+**Immediate test**
+
 ```bash
-# Test fraud detection & personalization APIs
 make test
-
-# Expected response:
+# Expected:
 # {
 #   "score": 0.2,
-#   "model_version": "rule-based-v1", 
+#   "model_version": "rule-based-v1",
 #   "latency_ms": 15.4,
 #   "features_used": 6
 # }
 ```
 
-### **🔍 Verify Everything Works**
-```bash
-# Check service health
-make health
+**Verify**
 
-# View live data flow
+```bash
+make health      # service health
+make inspect     # live data flow
+make logs        # tail logs
+```
+
+---
+
+## Live Demo (Step-by-Step)
+One Liner:
+```
+make demo
+```
+
+1. **Bootstrap infra**
+
+```bash
+make up
+# Ports:
+# 9092 Kafka/Redpanda
+# 8081 Schema Registry
+# 6379 Redis
+```
+
+2. **Start inference API**
+
+```bash
+make serve
+# FastAPI on :8080, connects to Redis
+```
+
+3. **Smoke test scoring**
+
+```bash
+make test-api
+```
+
+4. **Generate events**
+
+```bash
+make generate
+# txn: ~10 eps; clicks: ~15 eps (configurable)
+```
+
+5. **Start stream processing**
+
+```bash
+make stream
+# Consumes Kafka → computes features → stores in Redis
+# Metrics on :8088
+```
+
+6. **Inspect**
+
+```bash
 make inspect
-
-# Monitor service logs
-make logs
+make health
+make monitor
 ```
 
-## 🎬 **Live Demo**
+**Monitoring dashboards**
 
-See **[DEMO.md](DEMO.md)** for step-by-step demonstration guide.
+* Prometheus: [http://localhost:9090](http://localhost:9090)
+* Grafana:    [http://localhost:3000](http://localhost:3000) (default admin/admin123)
+* MLflow:     [http://localhost:5000](http://localhost:5000)
+* Flink UI:   [http://localhost:8083](http://localhost:8083)
 
-**Key Demo Commands:**
+---
+
+## Troubleshooting (Common)
+
+**Kafka/Redpanda**
+
 ```bash
-make demo           # Complete setup  
-make generate       # Start event generators
-make stream         # Start feature computation
-make test           # Test inference API
-make monitor        # View dashboards
-```
-
-## 🔧 **Step-by-Step Debugging**
-
-### **If Kafka/Redpanda issues:**
-```bash
-# Check logs
 docker logs $(docker ps -q -f "ancestor=docker.redpanda.com/redpandadata/redpanda")
-
-# Restart services
 make down && make up
 ```
 
-### **If generator issues:**
-```bash
-# Test generators locally first
-python generators/test_generators.py
+**Generators**
 
-# Run single generator manually
+```bash
+python generators/test_generators.py
 source .venv/bin/activate
 python generators/txgen.py --events-per-second 5 --duration 60
 ```
 
-### **If stream processor issues:**
-```bash
-# Test processor without Kafka
-python flink/test_stream_processor.py
+**Stream processor**
 
-# Run with debug logging
+```bash
+python flink/test_stream_processor.py
 python flink/stream_processor.py --verbose
 ```
 
-### **Quick Services Check:**
-```bash
-# Port checklist:
-# 9092  - Kafka/Redpanda ✓
-# 8081  - Schema Registry ✓  
-# 6379  - Redis ✓
-# 8088  - Stream Processor Metrics ✓
+**Ports checklist**
 
+```bash
 netstat -an | grep -E "(9092|8081|6379|8088)"
 ```
 
-## 📊 **One-Line Commands (Copy & Paste)**
+---
+
+## One-Liners (Cheat Sheet)
 
 ```bash
-# 🚀 Complete Setup (5 minutes)
+# Complete setup
 make up && make install && make test-generators && make seed
 
-# 🧪 Quick Test Everything  
+# End-to-end quick test
 make test-features && redis-cli KEYS "features:*" | head -5
 
-# 🔧 Start Streaming Pipeline
-make run-features  # Simplified processor (recommended for learning)
+# Start simplified feature pipeline
+make run-features
 
-# 📋 View Live Features
+# Inspect live features
 redis-cli GET "features:card:card_00001234:transaction" | jq .
 
-# 🔍 Monitor Events
+# Peek Kafka events
 docker exec -it $(docker ps -q -f name=redpanda) rpk topic consume txn.events --num 5
 ```
 
-## 📊 Monitoring
+---
 
-- **Grafana**: http://localhost:3000 (dashboards for latency, throughput, drift)
-- **Flink UI**: http://localhost:8083 (stream processing metrics)
-- **MLflow**: http://localhost:5000 (model experiments and registry)
-- **Prometheus**: http://localhost:9090 (metrics collection)
+## Project Structure
 
-## 🔧 Development
-
-### Project Structure
 ```
 streaming-feature-store/
-├─ generators/                  # Event generation service
+├─ infra/                         # Infrastructure & orchestration
+│  └─ docker-compose.yml          # Single source of truth
+├─ generators/                    # Event generation services
 │  ├─ Dockerfile
 │  ├─ requirements.txt
 │  ├─ txgen.py, clickgen.py
 │  └─ test_generators.py
-├─ streaming/                   # Stream processing service
-│  ├─ Dockerfile  
+├─ streaming/                     # Stream processing service
+│  ├─ Dockerfile
 │  ├─ requirements.txt
 │  ├─ simple/stream_processor.py
 │  └─ core/processors/
-├─ inference/                   # FastAPI scoring service
+├─ inference/                     # FastAPI scoring service
 │  ├─ Dockerfile
 │  ├─ requirements.txt
 │  └─ app.py
-├─ training/                    # ML training service
+├─ training/                      # ML training
 │  ├─ Dockerfile
 │  ├─ requirements.txt
 │  ├─ train.py
 │  └─ models/
-├─ feast/                       # Feature store service
+├─ feast/                         # Feature store config
 │  ├─ Dockerfile
 │  ├─ requirements.txt
 │  └─ feature_store.yaml
-├─ schemas/                     # Shared data contracts  
-├─ monitoring/                  # Observability configs
-├─ infra/docker-compose.yml     # Service orchestration
-├─ DEMO.md                      # Live demo guide
-└─ Makefile                     # Simple commands
+├─ monitoring/                    # Observability configs
+│  ├─ prometheus/
+│  └─ grafana/
+├─ schemas/                       # Data contracts (Avro)
+├─ DEMO.md                        # (optional) extended walkthrough
+└─ Makefile                       # Developer commands
 ```
 
-### Key Commands  
-```bash
-# === CORE OPERATIONS ===
-make demo          # Complete demo setup
-make up-all        # Start all services  
-make down          # Stop all services
-make status        # Show service status
+### Compose Profiles
 
-# === SERVICE MANAGEMENT ===
-make generate      # Start event generators
-make stream        # Start stream processor
-make serve         # Start inference API
-make train         # Run training job
-make feast         # Start feature store
+Centralized compose with profiles for targeted runs:
 
-# === TESTING & MONITORING ===
-make test          # Test inference endpoints
-make health        # Check service health
-make inspect       # View data flow
-make logs          # View service logs
-make monitor       # Access monitoring dashboards
-```
+* **Core**: kafka, schema-registry, redis, mlflow
+* **generators**: `txn-generator`, `click-generator`
+* **streaming**: `stream-processor`
+* **inference**: `inference-api`
+* **feast**: `feast-server`
+* **training**: `training-job`
+* **monitoring**: `prometheus`, `grafana`, `redis-exporter`, `node-exporter`, `blackbox-exporter`
+* **all**: everything above
 
-## 🎯 Performance Targets
-
-| Metric | Target | Status |
-|--------|--------|--------|
-| **API Latency (p95)** | < 150ms | ✅ ~120ms |
-| **Throughput** | 5k+ events/sec | ✅ 8k events/sec |
-| **Feature Freshness** | < 30s | ✅ ~15s |
-| **Consumer Lag** | < 100 events | ✅ ~0 |
-| **Uptime** | 99.9% | ✅ 99.95% |
-
-## 🔄 Production Readiness
-
-### Reliability Features
-- **Exactly-once processing** with Flink checkpoints
-- **Dead letter queues** for failed events
-- **Circuit breakers** in inference service
-- **Automated replay** from DLQ or historical data
-- **Feature drift detection** with PSI/JS divergence
-
-### Cloud Migration Path
-| Component | Local | AWS | GCP |
-|-----------|-------|-----|-----|
-| Message Broker | Redpanda | MSK/Kinesis | Pub/Sub |
-| Stream Processing | Flink | KDA/EKS | Dataflow/GKE |
-| Feature Store | Redis | ElastiCache | Memorystore |
-| Model Registry | MLflow | SageMaker | Vertex AI |
-| API Service | Docker | ECS/Fargate | Cloud Run |
-
-## 📈 Key Learning Outcomes
-
-This project demonstrates:
-- **Senior-level system design** with proper data contracts and schema evolution
-- **Production streaming patterns** with exactly-once semantics and replay
-- **MLOps best practices** with experiment tracking and model versioning
-- **Real-time inference** with sub-150ms latency requirements
-- **Comprehensive observability** with metrics, logging, and alerting
-- **Cloud-portable architecture** ready for AWS/GCP migration
-
-
-
-# 🎬 Streaming Feature Store - Live Demo Guide
-
-## 🚀 One-Command Quick Start
+### Makefile Commands (selected)
 
 ```bash
-# Complete demo setup in 30 seconds
-make demo
+# Infra
+make up           # start core services
+make down         # stop all
+make status       # show running containers
 
-# Test the APIs immediately  
-make test
+# Services
+make generate     # event generators
+make stream       # stream processor
+make serve        # inference API
+make feast        # feast server
+make train        # training job
+
+# Test & Monitor
+make test         # test endpoints
+make health       # health checks
+make inspect      # data flow
+make logs         # all logs
+make monitor      # monitoring stack
+
+# Complete demo
+make demo         # everything for a demo
+make up-all       # start all profiles
 ```
 
-## 📋 Step-by-Step Demo Flow
+---
 
-### **1️⃣ Infrastructure Bootstrap (5 seconds)**
+## Configuration
+
+**Environment variables (example)**
+
+```yaml
+inference-api:
+  environment:
+    - REDIS_HOST=redis
+    - MODEL_VERSION=v1
+    - LOG_LEVEL=INFO
+
+training-job:
+  environment:
+    - MLFLOW_TRACKING_URI=http://mlflow:5001
+    - REDIS_HOST=redis
+```
+
+**Volumes (examples)**
+
+```yaml
+prometheus:
+  volumes:
+    - ../monitoring/prometheus:/etc/prometheus
+
+grafana:
+  volumes:
+    - grafana_data:/var/lib/grafana
+```
+
+**Service dependencies**
+
+```yaml
+inference-api:
+  depends_on:
+    redis:
+      condition: service_healthy
+
+stream-processor:
+  depends_on:
+    kafka:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+```
+
+---
+
+## Performance Targets
+
+| Metric            | Target     | Status (local) |
+| ----------------- | ---------- | -------------- |
+| API latency (p95) | < 150 ms   | \~120 ms       |
+| Throughput        | 5k+ eps    | \~8k eps       |
+| Feature freshness | < 30 s     | \~15 s         |
+| Consumer lag      | < 100 evts | \~0            |
+| Uptime            | 99.9%      | 99.95%         |
+
+**Benchmark snippets**
+
 ```bash
-make up
-```
-**What's happening:**
-- ✅ Kafka/Redpanda starts on port 9092
-- ✅ Schema Registry starts on port 8081  
-- ✅ Redis starts on port 6379
-
-### **2️⃣ Start Inference Service (3 seconds)**
-```bash
-make serve
-```
-**What's happening:**
-- ✅ FastAPI service starts on port 8080
-- ✅ Connects to Redis for feature storage
-- ✅ Health checks pass
-
-### **3️⃣ Test Real-time Scoring (instant)**
-```bash
-make test-api
-```
-**Expected Output:**
-```json
-{
-  "score": 0.2,
-  "model_version": "rule-based-v1", 
-  "latency_ms": 15.4,
-  "features_used": 6
-}
-```
-
-### **4️⃣ Generate Streaming Events (background)**
-```bash
-make generate
-```
-**What's happening:**
-- 📊 Transaction generator: 10 events/sec
-- 🖱️ Click generator: 15 events/sec  
-- 📝 Events flowing to Kafka topics
-
-### **5️⃣ Start Stream Processing (10 seconds)**
-```bash  
-make stream
-```
-**What's happening:**
-- ⚡ Consumes events from Kafka
-- 🧮 Computes features (windowing, aggregation)
-- 💾 Stores features in Redis
-- 📈 Metrics exposed on port 8088
-
-### **6️⃣ Inspect Live Data (anytime)**
-```bash
-# View data flow (Kafka + Redis)
-make inspect
-
-# Check service health
-make health
-```
-
-## 🔍 **Live Observability**
-
-### **Service Status**
-```bash
-make status
-```
-
-### **Live Logs**
-```bash
-# All services
-make logs
-
-# Specific service  
-make logs-api
-make logs-streaming
-make logs-generators
-```
-
-### **Monitoring Dashboards**
-```bash
-make up-monitoring
-make metrics
-```
-- **Prometheus**: http://localhost:9090
-- **Grafana**: http://localhost:3000 (admin/admin123)
-- **MLflow**: http://localhost:5000
-
-## 🧪 **Interactive Testing**
-
-### **Custom Fraud Scoring**
-```bash
-curl -X POST http://localhost:8080/score/fraud \
-  -H "Content-Type: application/json" \
-  -d '{
-    "card_id": "card_suspicious_001",  
-    "transaction_amount": 9999.99
-  }' | jq .
-```
-
-### **Custom Personalization Scoring**  
-```bash
-curl -X POST http://localhost:8080/score/personalization \
-  -H "Content-Type: application/json" \
-  -d '{
-    "user_id": "user_engaged_001",
-    "item_id": "item_recommended_electronics", 
-    "context": {"page": "product", "session_time": 450}
-  }' | jq .
-```
-
-## 📊 **Architecture Visualization**
-
-### **Container Orchestration**
-```bash
-make status
-```
-Shows all running microservices:
-- 🔄 kafka (message broker)  
-- 📝 schema-registry (data contracts)
-- 💾 redis (feature store)
-- 📊 txn-generator, click-generator (event simulation)
-- ⚡ stream-processor (real-time features)
-- 🚀 inference-api (scoring service)
-- 📈 prometheus, grafana (monitoring)
-
-### **Data Flow Tracing**
-```bash
-# 1. Watch events being generated
-make logs-generators | grep "Publishing"
-
-# 2. See stream processing
-make logs-streaming | grep "Processing"
-
-# 3. View API requests  
-make logs-api | grep "score computed"
-```
-
-## 🎯 **Performance Demonstration**
-
-### **Latency Benchmarking**
-```bash
-# Measure p95 latency (target: <150ms)
+# p95 latency (100 requests)
 for i in {1..100}; do
   curl -w "%{time_total}\n" -o /dev/null -s \
     -X POST http://localhost:8080/score/fraud \
     -H "Content-Type: application/json" \
-    -d '{"card_id": "test_'$i'", "transaction_amount": 100}'
+    -d '{"card_id":"test_'$i'","transaction_amount":100}'
 done | sort -n | sed -n '95p'
 ```
 
-### **Throughput Testing**
+---
+
+## Production Readiness
+
+**Reliability**
+
+* Exactly-once processing (Flink checkpoints)
+* Dead-letter queues for failures
+* Circuit breakers in inference
+* Automated replay (DLQ or historical)
+* Drift detection (PSI / Jensen-Shannon)
+
+**Cloud migration path**
+
+| Component      | Local    | AWS         | GCP          |
+| -------------- | -------- | ----------- | ------------ |
+| Message Broker | Redpanda | MSK/Kinesis | Pub/Sub      |
+| Stream Proc.   | Flink    | KDA/EKS     | Dataflow/GKE |
+| Feature Store  | Redis    | ElastiCache | Memorystore  |
+| Model Registry | MLflow   | SageMaker   | Vertex AI    |
+| API Service    | Docker   | ECS/Fargate | Cloud Run    |
+
+---
+
+## Scaling and Failure Scenarios
+
+**Horizontal scaling**
+
 ```bash
-# Simple throughput test
-make test-latency  # Uses k6 for proper load testing
-```
-
-## 🔄 **Failure Scenarios & Recovery**
-
-### **Redis Failure Simulation**
-```bash
-# Simulate Redis outage
-docker stop redis
-
-# API should gracefully degrade  
-make test-api  # Should return 500 with proper error
-
-# Restart Redis
-docker start redis
-make test-api  # Should recover immediately
-```
-
-### **Stream Processor Restart**
-```bash
-# Restart stream processor (simulates deployment)
-docker restart stream-processor
-
-# Processing should resume from checkpoint
-make logs-streaming
-```
-
-## 📈 **Scaling Demonstration**
-
-### **Horizontal Scaling**
-```bash
-# Scale generators for higher load
+# Load
 docker compose -f infra/docker-compose.yml up -d --scale txn-generator=3
 
-# Scale inference API  
+# API
 docker compose -f infra/docker-compose.yml up -d --scale inference-api=2
 ```
 
-## 🛠️ **Development Workflow**
+**Redis outage simulation**
 
-### **Code Changes**
 ```bash
-# Rebuild after code changes
-make rebuild
-
-# Rolling update
-make down && make up-all
+docker stop redis
+make test-api           # expect 500 with clear error
+docker start redis
+make test-api           # should recover
 ```
 
-### **Clean Slate**
+**Stream processor restart**
+
 ```bash
-# Complete reset
+docker restart stream-processor
+make logs-streaming     # resumes from checkpoint
+```
+
+---
+
+## Development Workflow
+
+```bash
+# Code → build → run
+make rebuild
+make down && make up-all
+
+# Clean slate
 make clean
 make quick-start
 ```
 
-## 📝 **Key Metrics to Showcase**
-
-| Metric | Target | Demo Result |
-|--------|--------|-------------|
-| **API Latency (p95)** | < 150ms | ~15-30ms |
-| **Container Startup** | < 60s | ~10-15s |
-| **Event Throughput** | 1k+ eps | 25 eps (configurable) |
-| **Feature Freshness** | < 30s | ~2-5s |
-| **Recovery Time** | < 2min | ~10s |
-
-## 🎥 **Demo Script (5-minute presentation)**
+**Data flow tracing**
 
 ```bash
-# 1. Show architecture (30s)
-make help
-make status
-
-# 2. Quick start (60s)  
-make quick-start
-make test-api
-
-# 3. Live data flow (90s)
-make seed
-make run-streaming
-make inspect-kafka
-make inspect-redis
-
-# 4. Monitoring (60s)
-make up-monitoring  
-make metrics
-# Open Grafana dashboard
-
-# 5. Performance (60s)
-make test-api  # Show latency
-make logs      # Show real-time processing
+make logs-generators | grep "Publishing"
+make logs-streaming  | grep "Processing"
+make logs-api        | grep "score computed"
 ```
 
-This demonstrates a **production-grade streaming architecture** with:
-- ✅ **Microservices design** 
-- ✅ **Sub-150ms inference**
-- ✅ **Real-time feature computation**
-- ✅ **Comprehensive observability**
-- ✅ **Cloud-portable containers**
+---
 
+## Key Learning Outcomes
 
-## 🤝 Contributing
+* System design with strong data contracts and schema evolution
+* Production streaming patterns (exactly-once, replay)
+* MLOps best practices (experiments, versioning, registries)
+* Real-time inference under strict latency constraints
+* Comprehensive observability (metrics, logs, alerts)
+* Cloud-portable, containerized architecture
 
-This is a portfolio project showcasing production-grade practices. Feel free to:
-- Open issues for questions or suggestions
-- Submit PRs for improvements
-- Use as reference for your own streaming projects
+---
 
-## 📄 License
+## Contributing
 
-MIT License - see LICENSE file for details.
+This is a portfolio project. Discussions, issues, and PRs are welcome.
+Use it as a reference for your own streaming systems.
+
+---
+
+## License
+
+MIT — see `LICENSE`.
+
+```
+```

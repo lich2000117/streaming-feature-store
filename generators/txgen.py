@@ -247,8 +247,9 @@ class TransactionGenerator(BaseEventGenerator, TimestampMixin):
 @click.option('--fraud-rate', '-f', default=0.02, help='Fraud injection rate (0.0-1.0)')
 @click.option('--bootstrap-servers', '-b', default='localhost:9092', help='Kafka bootstrap servers')
 @click.option('--batch-size', default=100, help='Producer batch size')
+@click.option('--metrics-port', default=None, type=int, help='Port for metrics server (optional)')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose logging')
-def main(events_per_second, duration, fraud_rate, bootstrap_servers, batch_size, verbose):
+def main(events_per_second, duration, fraud_rate, bootstrap_servers, batch_size, metrics_port, verbose):
     """Transaction event generator for fraud detection."""
     
     if verbose:
@@ -260,7 +261,8 @@ def main(events_per_second, duration, fraud_rate, bootstrap_servers, batch_size,
             duration_seconds=duration,
             fraud_rate=fraud_rate,
             bootstrap_servers=bootstrap_servers,
-            batch_size=batch_size
+            batch_size=batch_size,
+            metrics_port=metrics_port
         )
         
         generator.run()

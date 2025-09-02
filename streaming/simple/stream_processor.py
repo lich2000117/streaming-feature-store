@@ -171,13 +171,16 @@ class StreamProcessor:
 @click.option('--consumer-group', default='feature-processor', help='Kafka consumer group')
 @click.option('--window-size', default=5, help='Window size in minutes')
 @click.option('--topics', default='txn.events,click.events', help='Comma-separated topic list')
-@click.option('--metrics-port', default=8088, help='Metrics server port')
+@click.option('--metrics-port', default=8000, help='Metrics server port')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose logging')
 def main(kafka_servers, redis_host, consumer_group, window_size, topics, metrics_port, verbose):
     """Run the stream processor for real-time feature engineering."""
     
     if verbose:
         logging.getLogger().setLevel(logging.DEBUG)
+    
+    # Get metrics port from environment or CLI
+    metrics_port = int(os.environ.get('METRICS_PORT', metrics_port))
         
     config = ProcessorConfig(
         kafka_bootstrap_servers=kafka_servers,

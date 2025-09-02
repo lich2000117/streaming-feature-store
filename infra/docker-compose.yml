@@ -66,7 +66,8 @@ services:
       context: ..
       dockerfile: generators/Dockerfile
     container_name: txn-generator
-    command: ["generators/txgen.py","--events-per-second","3","--duration","3600","--bootstrap-servers","kafka:9092"]
+    ports: [ "8001:8001" ]  # Expose metrics port
+    command: ["generators/txgen.py","--events-per-second","3","--duration","3600","--bootstrap-servers","kafka:9092","--metrics-port","8001"]
     depends_on:
       kafka:
         condition: service_healthy
@@ -78,7 +79,8 @@ services:
       context: ..
       dockerfile: generators/Dockerfile
     container_name: click-generator
-    command: ["generators/clickgen.py","--events-per-second","4","--duration","3600","--bootstrap-servers","kafka:9092"]
+    ports: [ "8002:8002" ]  # Expose metrics port
+    command: ["generators/clickgen.py","--events-per-second","4","--duration","3600","--bootstrap-servers","kafka:9092","--metrics-port","8002"]
     depends_on:
       kafka:
         condition: service_healthy
@@ -92,10 +94,12 @@ services:
       context: ..
       dockerfile: streaming/Dockerfile
     container_name: stream-processor
+    ports: [ "8000:8000" ]  # Expose metrics port
     environment:
       - KAFKA_SERVERS=kafka:9092
       - REDIS_HOST=redis
       - SCHEMA_REGISTRY_URL=http://schema-registry:8081
+      - METRICS_PORT=8000
     depends_on:
       kafka:
         condition: service_healthy

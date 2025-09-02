@@ -17,5 +17,7 @@ requests==2.31.0
 
 # Schema serialization
 avro-python3==1.10.2
-
 python-snappy>=0.7.1
+
+# Monitoring
+prometheus-client==0.21.0

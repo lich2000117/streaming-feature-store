@@ -12,7 +12,7 @@ down:       ## Stop all services and cleanup
 
 # === SERVICE MANAGEMENT ===
 generate:   ## Start event generators
-	docker compose -f infra/docker-compose.yml --profile generators up -d
+	docker compose -f infra/docker-compose.yml --profile generators up -d --build
 
 stream:     ## Start stream processing
 	docker compose -f infra/docker-compose.yml --profile streaming up -d --build
@@ -28,7 +28,7 @@ train:      ## Run ML training pipeline (with MLflow)
 	docker compose -f infra/docker-compose.yml up training-job --build
 
 monitor:    ## Start monitoring stack (prometheus, grafana)
-	docker compose -f infra/docker-compose.yml --profile monitoring up -d --build
+	docker compose -f infra/docker-compose.yml --profile monitoring up -d
 
 # === OBSERVABILITY ===
 logs-check:       ## View all service logs
@@ -52,6 +52,9 @@ logs-train:   ## View mlflow logs
 
 logs-api:   ## View inference API logs
 	docker compose -f infra/docker-compose.yml logs -f inference-api
+
+logs-grafana:   ## View inference API logs
+	docker compose -f infra/docker-compose.yml logs -f grafana
 
 # === DATA INSPECTION ===
 health:     ## Check service health status

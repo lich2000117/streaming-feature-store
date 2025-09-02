@@ -37,7 +37,7 @@ class ProcessorConfig:
     schema_dir: str = "schemas"
     
     # Monitoring
-    metrics_port: int = 8088
+    metrics_port: int = 8000
 
 
 class FeatureJobConfig(BaseModel):

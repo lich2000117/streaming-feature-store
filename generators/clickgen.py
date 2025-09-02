@@ -425,8 +425,9 @@ class ClickstreamGenerator(BaseEventGenerator, TimestampMixin):
 @click.option('--duration', '-d', default=None, type=int, help='Duration in seconds (infinite if not set)')
 @click.option('--bootstrap-servers', '-b', default='localhost:9092', help='Kafka bootstrap servers')
 @click.option('--batch-size', default=100, help='Producer batch size')
+@click.option('--metrics-port', default=None, type=int, help='Port for metrics server (optional)')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose logging')
-def main(events_per_second, duration, bootstrap_servers, batch_size, verbose):
+def main(events_per_second, duration, bootstrap_servers, batch_size, metrics_port, verbose):
     """Clickstream event generator for personalization."""
     
     if verbose:
@@ -437,7 +438,8 @@ def main(events_per_second, duration, bootstrap_servers, batch_size, verbose):
             events_per_second=events_per_second,
             duration_seconds=duration,
             bootstrap_servers=bootstrap_servers,
-            batch_size=batch_size
+            batch_size=batch_size,
+            metrics_port=metrics_port
         )
         
         generator.run()

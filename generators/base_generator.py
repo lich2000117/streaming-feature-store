@@ -23,6 +23,7 @@ from kafka.errors import KafkaError
 import avro.schema
 import avro.io
 import io
+from prometheus_client import Counter, Gauge, Histogram, start_http_server
 
 
 # Configure logging
@@ -43,7 +44,8 @@ class BaseEventGenerator(ABC):
         bootstrap_servers: str = "localhost:9092",
         events_per_second: float = 10.0,
         duration_seconds: Optional[int] = None,
-        batch_size: int = 100
+        batch_size: int = 100,
+        metrics_port: Optional[int] = None
     ):
         """
         Initialize the event generator.
@@ -82,6 +84,10 @@ class BaseEventGenerator(ABC):
         self.start_time = None
         self.errors = 0
         
+        # Metrics
+        self.metrics_port = metrics_port
+        self._setup_metrics()
+        
     def _load_schema(self, schema_file: str) -> avro.schema.Schema:
         """Load Avro schema from file."""
         try:
@@ -91,6 +97,24 @@ class BaseEventGenerator(ABC):
         except Exception as e:
             logger.error(f"Failed to load schema {schema_file}: {e}")
             raise
+    
+    def _setup_metrics(self):
+        """Set up Prometheus metrics."""
+        self.events_counter = Counter(
+            'generator_events_total',
+            'Total number of events generated',
+            ['generator_type', 'topic', 'status']
+        )
+        self.events_rate = Gauge(
+            'generator_events_per_second',
+            'Current event generation rate',
+            ['generator_type', 'topic']
+        )
+        self.generation_duration = Histogram(
+            'generator_event_generation_duration_seconds',
+            'Time taken to generate a single event',
+            ['generator_type', 'topic']
+        )
             
     def _serialize_avro(self, event: Dict[str, Any]) -> bytes:
         """Serialize event to Avro binary format."""
@@ -118,14 +142,36 @@ class BaseEventGenerator(ABC):
     def _on_send_success(self, record_metadata):
         """Callback for successful sends."""
         self.events_produced += 1
+        
+        # Update metrics
+        generator_type = self.__class__.__name__
+        self.events_counter.labels(
+            generator_type=generator_type,
+            topic=self.topic,
+            status='success'
+        ).inc()
+        
         if self.events_produced % 1000 == 0:
             elapsed = time.time() - self.start_time
             rate = self.events_produced / elapsed
+            self.events_rate.labels(
+                generator_type=generator_type,
+                topic=self.topic
+            ).set(rate)
             logger.info(f"Produced {self.events_produced} events, rate: {rate:.1f}/sec")
             
     def _on_send_error(self, ex):
         """Callback for send errors."""
         self.errors += 1
+        
+        # Update metrics
+        generator_type = self.__class__.__name__
+        self.events_counter.labels(
+            generator_type=generator_type,
+            topic=self.topic,
+            status='error'
+        ).inc()
+        
         logger.error(f"Failed to send event: {ex}")
         
     def produce_event(self, event: Dict[str, Any]) -> None:
@@ -151,6 +197,11 @@ class BaseEventGenerator(ABC):
         logger.info(f"Topic: {self.topic}")
         logger.info(f"Duration: {self.duration_seconds}s" if self.duration_seconds else "Duration: infinite")
         
+        # Start metrics server if port specified
+        if self.metrics_port:
+            start_http_server(self.metrics_port)
+            logger.info(f"Metrics server started on port {self.metrics_port}")
+        
         self.start_time = time.time()
         
         try:
@@ -166,8 +217,13 @@ class BaseEventGenerator(ABC):
                         break
                 
                 # Generate and send event
-                event = self.generate_event()
-                self.produce_event(event)
+                generator_type = self.__class__.__name__
+                with self.generation_duration.labels(
+                    generator_type=generator_type,
+                    topic=self.topic
+                ).time():
+                    event = self.generate_event()
+                    self.produce_event(event)
                 
                 # Rate limiting
                 if delay > 0:
