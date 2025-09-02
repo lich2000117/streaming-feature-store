@@ -1,54 +1,20 @@
-# Grafana Datasource Configuration for Streaming Feature Store
-# Comprehensive datasource setup for monitoring and observability
-
 apiVersion: 1
 
-# Delete existing datasources (clean setup)
-deleteDatasources:
-  - name: Prometheus
-    orgId: 1
-
 datasources:
-  # Primary Prometheus datasource
   - name: Prometheus
     type: prometheus
     access: proxy
     orgId: 1
+    uid: prometheus
     url: http://prometheus:9090
     isDefault: true
     editable: true
+    version: 1
     jsonData:
-      httpMethod: POST
+      httpMethod: GET
       queryTimeout: 60s
       timeInterval: 15s
-      # Custom query editor settings
-      # exemplarTraceIdDestinations:
-      #   - name: trace_id
-      #     datasourceUid: 'jaeger-uid'  # if Jaeger is added
       prometheusType: Prometheus
       prometheusVersion: 2.45.0
-      # Cache settings
-      cacheLevel: High
-      # Query optimization
       disableMetricsLookup: false
-      customQueryParameters: 'max_source_resolution=5m&partial_response=true'
     secureJsonData: {}
-
-
-  # TestData for dashboard development
-  - name: TestData
-    type: testdata
-    access: proxy
-    orgId: 1
-    editable: true
-    jsonData: {}
-
-# Global datasource settings
-# These apply to all datasources
-global:
-  # HTTP settings
-  timeout: 60
-  # Query settings
-  queryTimeout: 60s
-  # UI settings
-  defaultDatasource: Prometheus

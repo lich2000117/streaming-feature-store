@@ -1,97 +1,12 @@
-# Grafana Dashboard Provisioning Configuration
-# Automatic dashboard deployment for Streaming Feature Store monitoring
-
 apiVersion: 1
 
 providers:
-  # Main dashboard provider for streaming feature store
-  - name: 'streaming-feature-store'
+  - name: 'default'
     orgId: 1
-    folder: 'Streaming Feature Store'
+    folder: ''
     type: file
     disableDeletion: false
-    updateIntervalSeconds: 30
+    updateIntervalSeconds: 10
     allowUiUpdates: true
     options:
-      path: /etc/grafana/provisioning/dashboards/streaming-feature-store
-
-  # Infrastructure monitoring dashboards
-  - name: 'infrastructure'
-    orgId: 1
-    folder: 'Infrastructure'
-    type: file
-    disableDeletion: false
-    updateIntervalSeconds: 60
-    allowUiUpdates: true
-    options:
-      path: /etc/grafana/provisioning/dashboards/infrastructure
-
-  # ML Pipeline specific dashboards
-  - name: 'ml-pipeline'
-    orgId: 1
-    folder: 'ML Pipeline'
-    type: file
-    disableDeletion: false
-    updateIntervalSeconds: 60
-    allowUiUpdates: true
-    options:
-      path: /etc/grafana/provisioning/dashboards/ml-pipeline
-
-  # Business metrics dashboards
-  - name: 'business-metrics'
-    orgId: 1
-    folder: 'Business Metrics'
-    type: file
-    disableDeletion: false
-    updateIntervalSeconds: 300  # Update every 5 minutes
-    allowUiUpdates: true
-    options:
-      path: /etc/grafana/provisioning/dashboards/business-metrics
-
-  # SLI/SLO dashboards
-  - name: 'sli-slo'
-    orgId: 1
-    folder: 'SLI/SLO'
-    type: file
-    disableDeletion: false
-    updateIntervalSeconds: 60
-    allowUiUpdates: true
-    options:
-      path: /etc/grafana/provisioning/dashboards/sli-slo
-
-  # Alert management dashboards
-  - name: 'alerts'
-    orgId: 1
-    folder: 'Alerts'
-    type: file
-    disableDeletion: false
-    updateIntervalSeconds: 30
-    allowUiUpdates: true
-    options:
-      path: /etc/grafana/provisioning/dashboards/alerts
-
-# Dashboard folder structure will be:
-# └── Streaming Feature Store/
-#     ├── 01-system-overview.json
-#     ├── 02-inference-api.json
-#     ├── 03-feature-store.json
-#     ├── 04-stream-processing.json
-#     └── 05-real-time-monitoring.json
-# └── Infrastructure/
-#     ├── node-exporter.json
-#     ├── redis-monitoring.json
-#     └── kafka-monitoring.json
-# └── ML Pipeline/
-#     ├── model-performance.json
-#     ├── training-pipeline.json
-#     └── model-drift.json
-# └── Business Metrics/
-#     ├── fraud-detection.json
-#     ├── personalization.json
-#     └── business-kpis.json
-# └── SLI/SLO/
-#     ├── service-level-indicators.json
-#     └── slo-compliance.json
-# └── Alerts/
-#     ├── alert-overview.json
-#     └── alert-history.json
+      path: /var/lib/grafana/dashboards
