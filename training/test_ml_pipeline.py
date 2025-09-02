@@ -271,7 +271,7 @@ def main():
         print("\nNext steps:")
         print("1. Start MLflow server: make up")
         print("2. Run full training: make train")
-        print("3. Check outputs: ls ml/outputs/")
+        print("3. Check outputs: ls training/outputs/")
         print("4. Run drift check: make drift-check")
     else:
         print(f"\n⚠ {failed} tests failed. Check logs above.")

@@ -11,7 +11,7 @@ This script orchestrates the complete ML training pipeline:
 6. Model registration and ONNX export
 
 Usage:
-    python ml/train.py
+    python training/train.py
     make train
 """
 
@@ -28,9 +28,9 @@ import pandas as pd
 project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
-from ml.config import TrainingConfig
-from ml.datasets import FeatureStoreDataset, create_synthetic_features_for_testing
-from ml.models import ModelTrainer, MLflowExperimentManager
+from config import TrainingConfig
+from datasets import FeatureStoreDataset, create_synthetic_features_for_testing
+from models import ModelTrainer, MLflowExperimentManager
 
 # Configure logging
 logging.basicConfig(
@@ -38,7 +38,7 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     handlers=[
         logging.StreamHandler(),
-        logging.FileHandler('ml/training.log')
+        logging.FileHandler('training/training.log')
     ]
 )
 logger = logging.getLogger(__name__)
@@ -240,7 +240,7 @@ def main(config_file, model_type, experiment_name, fraud_rate, cv_folds, test_si
             print("Next Steps:")
             print("="*50)
             print("1. View experiment in MLflow UI: http://localhost:5000")
-            print("2. Check model artifacts in: ml/outputs/")
+            print("2. Check model artifacts in: training/outputs/")
             print("3. Test model serving: make serve")
             print("4. Run inference: curl -X POST http://localhost:8080/score")
             

@@ -6,9 +6,10 @@ lightgbm==4.3.0
 # MLflow for experiment tracking and model registry
 mlflow==2.10.2
 
-# Model serving
+# Model serving - Fixed versions for compatibility
 onnxmltools==1.12.0
 skl2onnx==1.16.0
+onnx==1.15.0
 onnxruntime==1.22.1
 
 # Data processing
@@ -29,5 +30,5 @@ python-dotenv==1.0.0
 pyyaml==6.0.1
 
 # Monitoring and drift detection
-evidently==0.4.12
-alibi-detect==0.12.0
+evidently>=0.5.0
+alibi-detect>=0.12.0

@@ -1,6 +1,8 @@
 # fixes: make kafka healthcheck target the in-network broker; add sane restart policies
 
 services:
+
+  # === CORE INFRASTRUCTURE ===
   kafka:
     image: docker.redpanda.com/redpandadata/redpanda:v23.3.3
     container_name: kafka
@@ -43,7 +45,22 @@ services:
       timeout: 5s
       retries: 10
     restart: unless-stopped
+  
+  mlflow:
+    image: ghcr.io/mlflow/mlflow:v2.16.0
+    container_name: mlflow
+    command: mlflow server --host 0.0.0.0 --port 5001 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlartifacts
+    volumes: 
+      - mlflow_data:/mlartifacts
+    ports: [ "5001:5001" ]
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5001/health || exit 1"]
+      interval: 10s
+      timeout: 30s
+      retries: 5
 
+
+  # === GENERATORS ===
   txn-generator:
     build:
       context: ..
@@ -131,30 +148,15 @@ services:
     container_name: training-job
     environment:
       - REDIS_HOST=redis
-      - MLFLOW_TRACKING_URI=http://mlflow:5000
+      - MLFLOW_TRACKING_URI=http://mlflow:5001
     volumes:
-      - ../training/models:/app/models
-      - ../training/artifacts:/app/artifacts
+      - ../training/outputs:/app/training/outputs
+      - ../training/models:/app/training/models
     depends_on:
       redis:
         condition: service_healthy
-      mlflow:
-        condition: service_healthy
-    profiles: ["training", "ml", "all"]
+    profiles: ["training", "all"]
 
-  mlflow:
-    image: ghcr.io/mlflow/mlflow:v2.16.0
-    container_name: mlflow
-    command: mlflow server --host 0.0.0.0 --port 5000 --backend-store-uri sqlite:///mlflow.db --default-artifact-root /mlartifacts
-    volumes: 
-      - mlflow_data:/mlartifacts
-    ports: [ "5000:5000" ]
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-    profiles: ["ml", "all"]
 
   # === MONITORING ===
   prometheus:

@@ -84,12 +84,12 @@ class TrainingConfig(BaseModel):
     
     # Training job configuration
     job_name: str = Field(default="fraud_detection_training", description="Training job name")
-    output_dir: str = Field(default="ml/outputs", description="Output directory")
+    output_dir: str = Field(default="training/outputs", description="Output directory")
     log_level: str = Field(default="INFO", description="Logging level")
     
     # Model serving preparation
     export_onnx: bool = Field(default=True, description="Export model to ONNX format")
-    onnx_path: str = Field(default="ml/models/fraud_model.onnx", description="ONNX model path")
+    onnx_path: str = Field(default="training/models/fraud_model.onnx", description="ONNX model path")
     
     # Feature store integration
     feature_views: List[str] = Field(

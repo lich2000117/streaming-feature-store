@@ -1,0 +1,1 @@
+["txn_count_5m", "txn_count_30m", "amount_avg_5m", "amount_sum_5m", "amount_max_5m", "amount_std_5m", "unique_countries_5m", "geo_diversity_score", "time_since_last_txn_min", "is_weekend", "hour_of_day", "velocity_score", "high_risk_txn_ratio", "is_high_velocity", "is_geo_diverse", "has_high_risk_mcc"]

@@ -177,12 +177,14 @@ class ModelTrainer:
         class_report = classification_report(y_test, y_pred, output_dict=True)
         
         # Add precision, recall, f1 for each class
+        # The classification report uses boolean labels ('True'/'False') instead of numeric ('1'/'0')
         metrics.update({
-            'test_precision': class_report['1']['precision'],
-            'test_recall': class_report['1']['recall'],
-            'test_f1': class_report['1']['f1-score'],
-            'test_accuracy': class_report['accuracy']
+            'test_precision': class_report['True']['precision'],
+            'test_recall': class_report['True']['recall'],
+            'test_f1': class_report['True']['f1-score'],
         })
+        
+        metrics['test_accuracy'] = class_report['accuracy']
         
         # Confusion matrix
         cm = confusion_matrix(y_test, y_pred)

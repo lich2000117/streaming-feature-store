@@ -1,7 +1,7 @@
 # 🚀 Streaming Feature Store - Production Container Orchestration
 
 # === CORE INFRASTRUCTURE ===
-up:         ## Start core infrastructure (kafka, redis, schema-registry)
+up:         ## Start core infrastructure (kafka, redis, schema-registry, mlflow)
 	docker compose -f infra/docker-compose.yml up -d
 
 up-all:     ## Start complete platform (all services)
@@ -12,47 +12,23 @@ down:       ## Stop all services and cleanup
 
 # === SERVICE MANAGEMENT ===
 generate:   ## Start event generators
-	docker compose -f infra/docker-compose.yml --profile generators up -d --build
+	docker compose -f infra/docker-compose.yml --profile generators up -d
 
 stream:     ## Start stream processing
 	docker compose -f infra/docker-compose.yml --profile streaming up -d --build
 
 serve:      ## Start inference API
 	docker compose -f infra/docker-compose.yml --profile inference up -d --build
-
-train:      ## Run ML training pipeline
-	docker compose -f infra/docker-compose.yml --profile training up training-job --build
-
+	
 feast_up:      ## Start feature store server, and apply feature definitions
 	docker compose -f infra/docker-compose.yml --profile feast up -d --build
 	docker exec -it feast-server feast apply
 
+train:      ## Run ML training pipeline (with MLflow)
+	docker compose -f infra/docker-compose.yml up training-job --build
+
 monitor:    ## Start monitoring stack (prometheus, grafana)
 	docker compose -f infra/docker-compose.yml --profile monitoring up -d --build
-
-# === TESTING & VALIDATION ===
-test-api:       ## Test inference API endpoints
-	@echo "🧪 Testing Fraud Detection API..."
-	curl -X POST http://localhost:8080/score/fraud \
-		-H "Content-Type: application/json" \
-		-d '{"card_id": "card_00001234", "transaction_amount": 150.0}' | jq .
-	@echo "\n🧪 Testing Personalization API..."
-	curl -X POST http://localhost:8080/score/personalization \
-		-H "Content-Type: application/json" \
-		-d '{"user_id": "user_00005678", "item_id": "item_electronics_001"}' | jq .
-
-health:     ## Check service health status
-	@echo "=== 🏥 Health Check ==="
-	@echo "📊 Kafka:"
-	@docker exec kafka rpk cluster info || echo "❌ Kafka unhealthy"
-	@echo "\n💾 Redis:" make
-	@docker exec redis redis-cli ping || echo "❌ Redis unhealthy"
-	@echo "\n🚀 API:"
-	@curl -s http://localhost:8080/health | jq . || echo "❌ API unhealthy"
-
-status:     ## Show service status
-	@echo "=== 📋 Service Status ==="
-	@docker compose -f infra/docker-compose.yml ps
 
 # === OBSERVABILITY ===
 logs-check:       ## View all service logs
@@ -67,20 +43,47 @@ logs-stream: ## View stream processor logs
 logs-feast: ## View feature store logs
 	docker compose -f infra/docker-compose.yml logs -f feast-server
 
+logs-ml:   ## View mlflow logs
+	docker compose -f infra/docker-compose.yml logs -f mlflow
+
+logs-train:   ## View mlflow logs
+	docker compose -f infra/docker-compose.yml logs -f training-job
+
 logs-gen:   ## View generator logs
 	docker compose -f infra/docker-compose.yml logs -f txn-generator click-generator
 
 # === DATA INSPECTION ===
+health:     ## Check service health status
+	@echo "=== 🏥 Health Check ==="
+	@echo "📊 Kafka:"
+	@docker exec kafka rpk cluster info || echo "❌ Kafka unhealthy"
+	@echo "\n💾 Redis:" make
+	@docker exec redis redis-cli ping || echo "❌ Redis unhealthy"
+	@echo "\n🚀 API:"
+	@curl -s http://localhost:8080/health | jq . || echo "❌ API unhealthy"
+
+status:     ## Show service status
+	@echo "=== 📋 Service Status ==="
+	@docker compose -f infra/docker-compose.yml ps
+
 inspect:    ## Inspect data flow (kafka + redis)
 	@echo "=== 📨 Kafka Topics ==="
 	@docker exec kafka rpk topic list
-	@echo "\n=== 📦 Sample Events ==="
-	@echo "Transactions:"
-	@timeout 3 docker exec kafka rpk topic consume txn.events --num 2 2>/dev/null || echo "No messages yet"
-	@echo "\nClicks:" 
-	@timeout 3 docker exec kafka rpk topic consume click.events --num 2 2>/dev/null || echo "No messages yet"
-	@echo "\n=== 🗂️ Feature Store ==="
+	@echo "=== 🗂️ Feature Store (Redis) ==="
+	@docker exec redis redis-cli eval "return #redis.call('keys','features:*')" 0
+	@echo "Top 5 feature keys:"
 	@docker exec redis redis-cli --scan --pattern "features:*" | head -5 || echo "No features yet"
+
+
+test-api:       ## Test inference API endpoints
+	@echo "🧪 Testing Fraud Detection API..."
+	curl -X POST http://localhost:8080/score/fraud \
+		-H "Content-Type: application/json" \
+		-d '{"card_id": "card_00001234", "transaction_amount": 150.0}' | jq .
+	@echo "\n🧪 Testing Personalization API..."
+	curl -X POST http://localhost:8080/score/personalization \
+		-H "Content-Type: application/json" \
+		-d '{"user_id": "user_00005678", "item_id": "item_electronics_001"}' | jq .
 
 # === DEVELOPMENT ===
 build:      ## Build all service images
@@ -106,6 +109,7 @@ demo:       ## 🎬 Complete demo setup
 	@echo "✅ Demo ready! Try these commands:"
 	@echo "  make generate    # Start event generators"
 	@echo "  make stream      # Start feature processing"
+	@echo "  make train       # Run ML training pipeline"
 	@echo "  make test        # Test the API"
 	@echo "  make inspect     # View live data"
 
@@ -115,7 +119,7 @@ urls:       ## Show service URLs
 	@echo "  API Docs:          http://localhost:8080/docs"
 	@echo "  Kafka UI:          http://localhost:9644" 
 	@echo "  Schema Registry:   http://localhost:8081"
-	@echo "  MLflow:            http://localhost:5000"
+	@echo "  MLflow:            http://localhost:5001"
 	@echo "  Prometheus:        http://localhost:9090"
 	@echo "  Grafana:           http://localhost:3000 (admin/admin123)"
 

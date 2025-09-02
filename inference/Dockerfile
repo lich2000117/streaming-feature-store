@@ -14,7 +14,7 @@ COPY inference/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy source code
-COPY . .
+COPY inference/ .
 
 # Copy schemas for validation
 COPY ../schemas/ ./schemas/

@@ -277,7 +277,7 @@ class DriftDetector:
         """Save drift detection report."""
         if output_path is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            output_path = f"ml/outputs/drift_report_{timestamp}.json"
+            output_path = f"training/outputs/drift_report_{timestamp}.json"
         
         os.makedirs(os.path.dirname(output_path), exist_ok=True)
         
@@ -347,7 +347,7 @@ def main(reference_data, max_samples, significance_level, output_path, redis_hos
                 score_info = drift_results['feature_drift_scores'][feature]
                 print(f"  - {feature}: {score_info['severity']} (p={score_info['p_value']:.6f})")
         
-        print(f"\nDetailed report saved to: {output_path or 'ml/outputs/drift_report_<timestamp>.json'}")
+        print(f"\nDetailed report saved to: {output_path or 'training/outputs/drift_report_<timestamp>.json'}")
         
     except Exception as e:
         logger.error(f"Drift detection failed: {e}")
