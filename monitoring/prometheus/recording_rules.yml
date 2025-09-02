@@ -1,0 +1,273 @@
+# Recording Rules for Streaming Feature Store
+# Pre-computed metrics for efficient dashboard queries and alerting
+
+groups:
+  # === API PERFORMANCE METRICS ===
+  - name: api_performance
+    interval: 30s
+    rules:
+      # Request rate by endpoint
+      - record: api:request_rate_5m
+        expr: sum(rate(inference_requests_total[5m])) by (endpoint, method, service)
+
+      # Error rate by endpoint
+      - record: api:error_rate_5m
+        expr: sum(rate(inference_requests_total{status!~"2.."}[5m])) by (endpoint, service)
+
+      # Success rate percentage
+      - record: api:success_rate_5m
+        expr: |
+          sum(rate(inference_requests_total{status=~"2.."}[5m])) by (endpoint, service) /
+          sum(rate(inference_requests_total[5m])) by (endpoint, service) * 100
+
+      # P95 latency by endpoint
+      - record: api:latency_p95_5m
+        expr: histogram_quantile(0.95, sum(rate(inference_request_duration_seconds_bucket[5m])) by (le, endpoint, service))
+
+      # P99 latency by endpoint
+      - record: api:latency_p99_5m
+        expr: histogram_quantile(0.99, sum(rate(inference_request_duration_seconds_bucket[5m])) by (le, endpoint, service))
+
+      # Average latency by endpoint
+      - record: api:latency_avg_5m
+        expr: |
+          sum(rate(inference_request_duration_seconds_sum[5m])) by (endpoint, service) /
+          sum(rate(inference_request_duration_seconds_count[5m])) by (endpoint, service)
+
+  # === FEATURE STORE METRICS ===
+  - name: feature_store_performance
+    interval: 30s
+    rules:
+      # Feature fetch rate
+      - record: features:fetch_rate_5m
+        expr: sum(rate(feature_fetch_duration_seconds_count[5m])) by (service)
+
+      # Feature fetch P95 latency
+      - record: features:fetch_latency_p95_5m
+        expr: histogram_quantile(0.95, sum(rate(feature_fetch_duration_seconds_bucket[5m])) by (le, service))
+
+      # Cache hit rate
+      - record: features:cache_hit_rate_5m
+        expr: |
+          rate(feature_cache_hits_total[5m]) /
+          (rate(feature_cache_hits_total[5m]) + rate(feature_cache_misses_total[5m])) * 100
+
+      # Redis operations rate
+      - record: redis:ops_rate_5m
+        expr: sum(rate(redis_commands_processed_total[5m])) by (instance)
+
+      # Redis memory utilization
+      - record: redis:memory_utilization
+        expr: redis_memory_used_bytes / redis_memory_max_bytes * 100
+
+  # === MODEL PERFORMANCE METRICS ===
+  - name: model_performance
+    interval: 30s
+    rules:
+      # Model inference rate
+      - record: model:inference_rate_5m
+        expr: sum(rate(model_inference_duration_seconds_count[5m])) by (model_type, model_version)
+
+      # Model inference P95 latency
+      - record: model:inference_latency_p95_5m
+        expr: histogram_quantile(0.95, sum(rate(model_inference_duration_seconds_bucket[5m])) by (le, model_type, model_version))
+
+      # Average prediction scores by model type
+      - record: model:avg_prediction_score_5m
+        expr: avg_over_time(prediction_scores[5m]) by (model_type)
+
+      # Model confidence distribution
+      - record: model:avg_confidence_5m
+        expr: avg_over_time(model_confidence_scores[5m]) by (model_type, model_version)
+
+  # === STREAM PROCESSING METRICS ===
+  - name: stream_processing
+    interval: 60s
+    rules:
+      # Event processing rate
+      - record: stream:event_rate_5m
+        expr: sum(rate(stream_events_processed_total[5m])) by (service, event_type)
+
+      # Kafka consumer lag by topic
+      - record: kafka:consumer_lag_5m
+        expr: sum(kafka_consumer_lag_sum) by (topic, consumer_group)
+
+      # Stream processing latency
+      - record: stream:processing_latency_p95_5m
+        expr: histogram_quantile(0.95, sum(rate(stream_processing_duration_seconds_bucket[5m])) by (le, service))
+
+  # === BUSINESS METRICS ===
+  - name: business_metrics
+    interval: 300s  # 5 minute intervals for business metrics
+    rules:
+      # Fraud detection rate (hourly)
+      - record: business:fraud_rate_1h
+        expr: avg_over_time(fraud_prediction_scores[1h])
+
+      # Transaction volume by hour
+      - record: business:transaction_volume_1h
+        expr: sum(increase(inference_requests_total{endpoint="/score/fraud"}[1h]))
+
+      # Personalization requests by hour
+      - record: business:personalization_volume_1h
+        expr: sum(increase(inference_requests_total{endpoint="/score/personalization"}[1h]))
+
+      # Average feature freshness
+      - record: business:avg_feature_freshness_5m
+        expr: avg_over_time(feature_freshness_seconds[5m])
+
+      # Model prediction distribution
+      - record: business:fraud_score_distribution_1h
+        expr: histogram_quantile(0.5, sum(rate(prediction_scores_bucket{model_type="fraud"}[1h])) by (le))
+
+  # === INFRASTRUCTURE METRICS ===
+  - name: infrastructure
+    interval: 60s
+    rules:
+      # CPU utilization by service
+      - record: infra:cpu_utilization_5m
+        expr: |
+          100 - (avg by (instance, service) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+
+      # Memory utilization by service
+      - record: infra:memory_utilization_5m
+        expr: |
+          (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100
+
+      # Network I/O rate
+      - record: infra:network_io_rate_5m
+        expr: |
+          sum(rate(node_network_receive_bytes_total[5m]) + rate(node_network_transmit_bytes_total[5m])) by (instance)
+
+      # Service availability
+      - record: infra:service_availability_5m
+        expr: avg_over_time(up[5m]) by (job, instance)
+
+  # === SLI/SLO TRACKING ===
+  - name: sli_slo_tracking
+    interval: 60s
+    rules:
+      # Overall API availability (2xx responses)
+      - record: sli:api_availability_5m
+        expr: |
+          sum(rate(inference_requests_total{status=~"2.."}[5m])) /
+          sum(rate(inference_requests_total[5m])) * 100
+
+      # API latency SLI (< 150ms target)
+      - record: sli:api_latency_sli_5m
+        expr: |
+          sum(rate(inference_request_duration_seconds_bucket{le="0.15"}[5m])) /
+          sum(rate(inference_request_duration_seconds_count[5m])) * 100
+
+      # Feature store availability
+      - record: sli:feature_store_availability_5m
+        expr: avg_over_time(up{job="redis"}[5m]) * 100
+
+      # Stream processing health (based on lag)
+      - record: sli:stream_health_5m
+        expr: |
+          (
+            (kafka_consumer_lag_sum < 1000) and
+            (rate(stream_events_processed_total[5m]) > 0)
+          ) * 100
+
+      # Overall system health score
+      - record: sli:system_health_score_5m
+        expr: |
+          (
+            (sli:api_availability_5m * 0.4) +
+            (sli:api_latency_sli_5m * 0.3) +
+            (sli:feature_store_availability_5m * 0.2) +
+            (sli:stream_health_5m * 0.1)
+          )
+
+  # === AGGREGATED METRICS FOR DASHBOARDS ===
+  - name: dashboard_aggregations
+    interval: 60s
+    rules:
+      # Total requests per minute
+      - record: dashboard:total_requests_1m
+        expr: sum(rate(inference_requests_total[1m]) * 60)
+
+      # Total errors per minute
+      - record: dashboard:total_errors_1m
+        expr: sum(rate(inference_requests_total{status!~"2.."}[1m]) * 60)
+
+      # Active users (based on unique request patterns)
+      - record: dashboard:active_users_5m
+        expr: count by () (count by (user_id) (rate(inference_requests_total{endpoint="/score/personalization"}[5m])))
+
+      # Feature store query volume
+      - record: dashboard:feature_queries_1m
+        expr: sum(rate(feature_fetch_duration_seconds_count[1m]) * 60)
+
+      # Model prediction volume by type
+      - record: dashboard:predictions_by_type_1m
+        expr: sum(rate(model_inference_duration_seconds_count[1m]) * 60) by (model_type)
+
+      # Top endpoints by traffic
+      - record: dashboard:top_endpoints_5m
+        expr: topk(5, sum(rate(inference_requests_total[5m])) by (endpoint))
+
+      # Error rate by status code
+      - record: dashboard:errors_by_status_5m
+        expr: sum(rate(inference_requests_total{status!~"2.."}[5m])) by (status)
+
+  # === CAPACITY PLANNING METRICS ===
+  - name: capacity_planning
+    interval: 300s  # 5 minute intervals for capacity metrics
+    rules:
+      # Peak requests per second (daily)
+      - record: capacity:peak_rps_24h
+        expr: max_over_time(api:request_rate_5m[24h])
+
+      # Average daily request volume
+      - record: capacity:avg_daily_requests
+        expr: avg_over_time(api:request_rate_5m[24h]) * 86400
+
+      # Resource utilization trends
+      - record: capacity:cpu_trend_24h
+        expr: avg_over_time(infra:cpu_utilization_5m[24h])
+
+      - record: capacity:memory_trend_24h
+        expr: avg_over_time(infra:memory_utilization_5m[24h])
+
+      # Storage growth rate
+      - record: capacity:redis_memory_growth_24h
+        expr: increase(redis_memory_used_bytes[24h])
+
+      # Model inference load trends
+      - record: capacity:inference_load_trend_24h
+        expr: avg_over_time(model:inference_rate_5m[24h])
+
+  # === ALERTING HELPER METRICS ===
+  - name: alerting_helpers
+    interval: 30s
+    rules:
+      # Service health indicators
+      - record: alert:service_health
+        expr: |
+          (up * 100) and
+          (sli:api_availability_5m > 99) and
+          (sli:api_latency_sli_5m > 95)
+
+      # Critical error indicator
+      - record: alert:critical_errors
+        expr: |
+          (api:error_rate_5m > 0.01) or
+          (up{job=~"inference-api|redis|kafka"} == 0) or
+          (sli:system_health_score_5m < 90)
+
+      # Performance degradation indicator
+      - record: alert:performance_degraded
+        expr: |
+          (api:latency_p95_5m > 0.15) or
+          (features:fetch_latency_p95_5m > 0.01) or
+          (model:inference_latency_p95_5m > 0.05)
+
+      # Business anomaly indicator
+      - record: alert:business_anomaly
+        expr: |
+          (business:fraud_rate_1h > 0.1) or
+          (business:avg_feature_freshness_5m > 300) or
+          (model:avg_confidence_5m < 0.7)

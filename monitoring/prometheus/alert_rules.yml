@@ -1,0 +1,335 @@
+# Production Alert Rules for Streaming Feature Store
+# Comprehensive alerting covering SLIs, infrastructure, and business metrics
+
+groups:
+  # === INFERENCE API ALERTS ===
+  - name: inference_api_alerts
+    rules:
+      # High latency alert - Critical for real-time serving
+      - alert: InferenceAPIHighLatency
+        expr: histogram_quantile(0.95, sum(rate(inference_request_duration_seconds_bucket[5m])) by (le, endpoint)) > 0.15
+        for: 2m
+        labels:
+          severity: critical
+          service: inference-api
+          slo: latency
+        annotations:
+          summary: "Inference API p95 latency exceeds 150ms SLA"
+          description: "The inference API p95 latency is {{ $value | humanizeDuration }} for endpoint {{ $labels.endpoint }}, exceeding the 150ms SLA."
+          runbook_url: "https://runbook.company.com/inference-api-latency"
+
+      # High error rate alert
+      - alert: InferenceAPIHighErrorRate
+        expr: sum(rate(inference_requests_total{status!~"2.."}[5m])) by (service) / sum(rate(inference_requests_total[5m])) by (service) > 0.01
+        for: 1m
+        labels:
+          severity: critical
+          service: inference-api
+          slo: availability
+        annotations:
+          summary: "Inference API error rate exceeds 1%"
+          description: "The inference API error rate is {{ $value | humanizePercentage }} over the last 5 minutes."
+
+      # Service down alert
+      - alert: InferenceAPIDown
+        expr: up{job="inference-api"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: inference-api
+        annotations:
+          summary: "Inference API is down"
+          description: "The inference API has been down for more than 30 seconds."
+
+      # High active requests (potential overload)
+      - alert: InferenceAPIHighLoad
+        expr: inference_active_requests > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: inference-api
+        annotations:
+          summary: "Inference API experiencing high load"
+          description: "The inference API has {{ $value }} active requests, indicating potential overload."
+
+      # Model inference latency
+      - alert: ModelInferenceSlowness
+        expr: histogram_quantile(0.95, sum(rate(model_inference_duration_seconds_bucket[5m])) by (le)) > 0.05
+        for: 3m
+        labels:
+          severity: warning
+          service: inference-api
+          component: model
+        annotations:
+          summary: "Model inference is slow"
+          description: "Model inference p95 latency is {{ $value | humanizeDuration }}, exceeding expected performance."
+
+  # === FEATURE STORE ALERTS ===
+  - name: feature_store_alerts
+    rules:
+      # Redis connection issues
+      - alert: RedisConnectionFailure
+        expr: redis_connected_clients{job="redis"} == 0 or absent(redis_connected_clients)
+        for: 30s
+        labels:
+          severity: critical
+          service: redis
+          component: feature-store
+        annotations:
+          summary: "Redis feature store is unreachable"
+          description: "Cannot connect to Redis feature store. All inference requests will use default features."
+
+      # High Redis memory usage
+      - alert: RedisHighMemoryUsage
+        expr: redis_memory_used_bytes / redis_memory_max_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          service: redis
+          component: feature-store
+        annotations:
+          summary: "Redis memory usage is high"
+          description: "Redis memory usage is {{ $value | humanizePercentage }} of available memory."
+
+      # Feature fetch latency
+      - alert: FeatureFetchSlowness
+        expr: histogram_quantile(0.95, sum(rate(feature_fetch_duration_seconds_bucket[5m])) by (le)) > 0.01
+        for: 3m
+        labels:
+          severity: warning
+          service: inference-api
+          component: feature-fetch
+        annotations:
+          summary: "Feature fetching is slow"
+          description: "Feature fetch p95 latency is {{ $value | humanizeDuration }}, impacting inference performance."
+
+      # Low cache hit rate
+      - alert: FeatureCacheLowHitRate
+        expr: rate(feature_cache_hits_total[5m]) / (rate(feature_cache_hits_total[5m]) + rate(feature_cache_misses_total[5m])) < 0.7
+        for: 10m
+        labels:
+          severity: warning
+          service: inference-api
+          component: feature-cache
+        annotations:
+          summary: "Feature cache hit rate is low"
+          description: "Feature cache hit rate is {{ $value | humanizePercentage }}, indicating potential performance issues."
+
+  # === STREAM PROCESSING ALERTS ===
+  - name: stream_processing_alerts
+    rules:
+      # Stream processor down
+      - alert: StreamProcessorDown
+        expr: up{job="stream-processor"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: stream-processor
+        annotations:
+          summary: "Stream processor is down"
+          description: "Stream processor has been down for more than 1 minute. Features are not being updated."
+
+      # High processing lag
+      - alert: StreamProcessingLag
+        expr: kafka_consumer_lag_sum{job="stream-processor"} > 10000
+        for: 5m
+        labels:
+          severity: warning
+          service: stream-processor
+          component: kafka-consumer
+        annotations:
+          summary: "Stream processing lag is high"
+          description: "Kafka consumer lag is {{ $value }} messages, indicating processing delays."
+
+      # Low throughput
+      - alert: StreamProcessingLowThroughput
+        expr: rate(stream_events_processed_total[5m]) < 10
+        for: 10m
+        labels:
+          severity: warning
+          service: stream-processor
+        annotations:
+          summary: "Stream processing throughput is low"
+          description: "Processing only {{ $value }} events per second, below expected rate."
+
+  # === KAFKA/MESSAGING ALERTS ===
+  - name: kafka_alerts
+    rules:
+      # Kafka cluster down
+      - alert: KafkaDown
+        expr: up{job="kafka"} == 0
+        for: 30s
+        labels:
+          severity: critical
+          service: kafka
+        annotations:
+          summary: "Kafka cluster is down"
+          description: "Kafka cluster is unreachable. Event ingestion and processing will be affected."
+
+      # High producer latency
+      - alert: KafkaHighProducerLatency
+        expr: kafka_producer_request_latency_avg > 100
+        for: 5m
+        labels:
+          severity: warning
+          service: kafka
+        annotations:
+          summary: "Kafka producer latency is high"
+          description: "Kafka producer latency is {{ $value }}ms, indicating potential issues."
+
+      # Topic partition offline
+      - alert: KafkaPartitionOffline
+        expr: kafka_cluster_partition_offline > 0
+        for: 1m
+        labels:
+          severity: critical
+          service: kafka
+        annotations:
+          summary: "Kafka partitions are offline"
+          description: "{{ $value }} Kafka partitions are offline, affecting data processing."
+
+  # === ML PIPELINE ALERTS ===
+  - name: ml_pipeline_alerts
+    rules:
+      # MLflow tracking server down
+      - alert: MLflowDown
+        expr: up{job="mlflow"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          service: mlflow
+        annotations:
+          summary: "MLflow tracking server is down"
+          description: "MLflow tracking server is unreachable. Model training and registry operations may be affected."
+
+      # Model training failure
+      - alert: ModelTrainingFailure
+        expr: increase(ml_training_jobs_failed_total[1h]) > 0
+        for: 0m
+        labels:
+          severity: warning
+          service: training-pipeline
+        annotations:
+          summary: "Model training job failed"
+          description: "{{ $value }} model training jobs have failed in the last hour."
+
+      # Model drift detection
+      - alert: ModelDriftDetected
+        expr: model_drift_score > 0.2
+        for: 0m
+        labels:
+          severity: warning
+          service: inference-api
+          component: model-monitoring
+        annotations:
+          summary: "Model drift detected"
+          description: "Model drift score is {{ $value }}, indicating potential model degradation."
+
+  # === BUSINESS LOGIC ALERTS ===
+  - name: business_alerts
+    rules:
+      # Abnormally high fraud rate
+      - alert: HighFraudRate
+        expr: avg_over_time(fraud_prediction_scores[1h]) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+          service: inference-api
+          type: business
+        annotations:
+          summary: "Fraud detection rate is unusually high"
+          description: "Average fraud score over the last hour is {{ $value | humanizePercentage }}, above normal baseline."
+
+      # Low prediction confidence
+      - alert: LowModelConfidence
+        expr: avg_over_time(model_confidence_scores[30m]) < 0.7
+        for: 30m
+        labels:
+          severity: warning
+          service: inference-api
+          component: model
+        annotations:
+          summary: "Model confidence is low"
+          description: "Average model confidence is {{ $value | humanizePercentage }}, indicating potential model issues."
+
+      # Feature freshness warning
+      - alert: StaleFeatures
+        expr: max_over_time(feature_freshness_seconds[10m]) > 300
+        for: 5m
+        labels:
+          severity: warning
+          service: feature-store
+        annotations:
+          summary: "Features are becoming stale"
+          description: "Maximum feature age is {{ $value | humanizeDuration }}, affecting prediction quality."
+
+  # === INFRASTRUCTURE ALERTS ===
+  - name: infrastructure_alerts
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% on instance {{ $labels.instance }}."
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          component: infrastructure
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value | humanizePercentage }} on instance {{ $labels.instance }}."
+
+      # Disk space warning
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) < 0.1
+        for: 5m
+        labels:
+          severity: critical
+          component: infrastructure
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is {{ $value | humanizePercentage }} full on {{ $labels.instance }}:{{ $labels.mountpoint }}."
+
+  # === COMPOSITE SLI ALERTS ===
+  - name: sli_alerts
+    rules:
+      # Overall system health
+      - alert: SystemHealthDegraded
+        expr: |
+          (
+            (rate(inference_requests_total{status!~"2.."}[5m]) / rate(inference_requests_total[5m]) > 0.01) or
+            (histogram_quantile(0.95, rate(inference_request_duration_seconds_bucket[5m])) > 0.15) or
+            (up{job="redis"} == 0) or
+            (up{job="kafka"} == 0)
+          )
+        for: 2m
+        labels:
+          severity: warning
+          type: sli
+        annotations:
+          summary: "System health is degraded"
+          description: "One or more SLIs are failing: check error rates, latency, and service availability."
+
+      # Critical system failure
+      - alert: SystemCriticalFailure
+        expr: |
+          (
+            (up{job="inference-api"} == 0) or
+            (up{job="redis"} == 0 and up{job="kafka"} == 0)
+          )
+        for: 1m
+        labels:
+          severity: critical
+          type: sli
+        annotations:
+          summary: "Critical system failure"
+          description: "Core system components are down. Immediate intervention required."

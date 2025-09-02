@@ -34,8 +34,8 @@ monitor:    ## Start monitoring stack (prometheus, grafana)
 logs-check:       ## View all service logs
 	docker compose -f infra/docker-compose.yml logs -f
 
-logs-api:   ## View inference API logs
-	docker compose -f infra/docker-compose.yml logs -f inference-api
+logs-gen:   ## View generator logs
+	docker compose -f infra/docker-compose.yml logs -f txn-generator click-generator
 
 logs-stream: ## View stream processor logs
 	docker compose -f infra/docker-compose.yml logs -f stream-processor
@@ -49,8 +49,9 @@ logs-ml:   ## View mlflow logs
 logs-train:   ## View mlflow logs
 	docker compose -f infra/docker-compose.yml logs -f training-job
 
-logs-gen:   ## View generator logs
-	docker compose -f infra/docker-compose.yml logs -f txn-generator click-generator
+
+logs-api:   ## View inference API logs
+	docker compose -f infra/docker-compose.yml logs -f inference-api
 
 # === DATA INSPECTION ===
 health:     ## Check service health status

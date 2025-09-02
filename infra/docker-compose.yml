@@ -164,13 +164,16 @@ services:
     container_name: prometheus
     ports: [ "9090:9090" ]
     volumes:
-      - ../monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - ../monitoring/prometheus:/etc/prometheus
       - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
     profiles: ["monitoring", "all"]
 
   grafana:
@@ -184,6 +187,45 @@ services:
       - ../monitoring/grafana/dashboards:/var/lib/grafana/dashboards
       - ../monitoring/grafana/provisioning:/etc/grafana/provisioning
     depends_on: [ prometheus ]
+    profiles: ["monitoring", "all"]
+
+  redis-exporter:
+    image: oliver006/redis_exporter:v1.58.0
+    container_name: redis-exporter
+    ports: [ "9121:9121" ]
+    environment:
+      - REDIS_ADDR=redis://redis:6379
+    command:
+      - '--redis.addr=redis://redis:6379'
+      - '--web.listen-address=0.0.0.0:9121'
+    depends_on:
+      redis:
+        condition: service_healthy
+    profiles: ["monitoring", "all"]
+
+  node-exporter:
+    image: prom/node-exporter:v1.7.0
+    container_name: node-exporter
+    ports: [ "9100:9100" ]
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.rootfs=/rootfs'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    profiles: ["monitoring", "all"]
+
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.24.0
+    container_name: blackbox-exporter
+    ports: [ "9115:9115" ]
+    volumes:
+      - ../monitoring/blackbox:/etc/blackbox_exporter
+    command:
+      - '--config.file=/etc/blackbox_exporter/config.yml'
     profiles: ["monitoring", "all"]
 
 # === NETWORKING ===

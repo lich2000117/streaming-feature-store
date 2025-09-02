@@ -135,7 +135,7 @@ async def lifespan(app: FastAPI):
     
     if feature_client:
         feature_client.close()
-    
+
     logger.info("Service shutdown completed")
 
 
@@ -556,8 +556,8 @@ async def score_batch(request: BatchScoreRequest, request_id: str = Depends(get_
                     )
                 
                 responses.append(response)
-                
-            except Exception as e:
+        
+    except Exception as e:
                 error_detail = {
                     "request_index": i,
                     "error": str(e)
