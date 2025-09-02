@@ -25,7 +25,7 @@ import logging
 # Add project root to path (go up two levels from streaming/simple/ to project root)
 sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
-from kafka import KafkaConsumer
+from kafka import KafkaConsumer, TopicPartition
 import click
 import structlog
 from prometheus_client import Counter, Histogram, Gauge, start_http_server
@@ -115,14 +115,17 @@ class StreamProcessor:
                 if partitions:
                     for partition in partitions:
                         try:
+                            # Create TopicPartition object
+                            tp = TopicPartition(topic, partition)
+                            
                             # Get high water mark (latest offset)
-                            high_water_mark = self.consumer.highwater(partition)
+                            high_water_mark = self.consumer.highwater(tp)
                             
                             # Get current consumer offset
-                            committed_offset = self.consumer.committed(partition)
+                            committed_offset = self.consumer.committed(tp)
                             
                             # Calculate lag
-                            lag = high_water_mark - (committed_offset or 0) if high_water_mark and committed_offset else 0
+                            lag = high_water_mark - (committed_offset or 0) if high_water_mark is not None and committed_offset is not None else 0
                             
                             # Update metric
                             KAFKA_CONSUMER_LAG.labels(
@@ -132,13 +135,19 @@ class StreamProcessor:
                             ).set(lag)
                             
                         except Exception as e:
-                            logger.warning("Failed to get lag for partition", 
-                                         topic=topic, partition=partition, error=str(e))
+                            logger.warning("Failed to get lag for partition",
+                                         topic=topic,
+                                         partition=partition,
+                                         error=str(e),
+                                         error_type=type(e).__name__)
                             
             self._last_lag_check = current_time
             
         except Exception as e:
-            logger.warning("Failed to update consumer lag metrics", error=str(e))
+            logger.warning("Failed to update consumer lag metrics",
+                         error=str(e),
+                         error_type=type(e).__name__,
+                         topics=self.config.topics)
         
     def start(self):
         """Start the stream processor."""

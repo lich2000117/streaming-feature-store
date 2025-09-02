@@ -121,6 +121,12 @@
       "doc": "System processing timestamp (set by producer)"
     },
     {
+      "name": "is_fraud",
+      "type": "boolean",
+      "default": false,
+      "doc": "Ground truth fraud label for model training and validation"
+    },
+    {
       "name": "metadata",
       "type": {
         "type": "map",

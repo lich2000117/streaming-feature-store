@@ -54,7 +54,12 @@ class BaseResponse(BaseModel):
     model_version: str = Field(description="Model version used")
     latency_ms: float = Field(description="Request latency in milliseconds")
     
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(
+        extra="forbid",
+        json_encoders={
+            datetime: lambda v: v.isoformat()
+        }
+    )
 
 
 # === Fraud Detection Models ===
@@ -315,6 +320,12 @@ class BatchScoreResponse(BaseModel):
     
     processing_time_ms: float = Field(description="Total processing time in milliseconds")
     timestamp: datetime = Field(description="Batch completion timestamp")
+    
+    model_config = ConfigDict(
+        json_encoders={
+            datetime: lambda v: v.isoformat()
+        }
+    )
 
 
 # === Health and Monitoring Models ===
@@ -343,6 +354,12 @@ class HealthResponse(BaseModel):
     request_count: int = Field(description="Total requests processed")
     error_rate: float = Field(description="Current error rate")
     avg_latency_ms: float = Field(description="Average latency in milliseconds")
+    
+    model_config = ConfigDict(
+        json_encoders={
+            datetime: lambda v: v.isoformat()
+        }
+    )
 
 
 class ReadinessResponse(BaseModel):
@@ -355,6 +372,12 @@ class ReadinessResponse(BaseModel):
     model_loaded: bool = Field(description="Whether ML model is loaded")
     redis_connected: bool = Field(description="Whether Redis is connected")
     dependencies_ready: bool = Field(description="Whether all dependencies are ready")
+    
+    model_config = ConfigDict(
+        json_encoders={
+            datetime: lambda v: v.isoformat()
+        }
+    )
 
 
 # === Error Models ===
@@ -371,6 +394,12 @@ class ErrorDetail(BaseModel):
     request_id: Optional[str] = Field(default=None, description="Request ID where error occurred")
     component: Optional[str] = Field(default=None, description="Component that generated the error")
     stack_trace: Optional[str] = Field(default=None, description="Stack trace (debug mode only)")
+    
+    model_config = ConfigDict(
+        json_encoders={
+            datetime: lambda v: v.isoformat()
+        }
+    )
 
 
 class ErrorResponse(BaseModel):

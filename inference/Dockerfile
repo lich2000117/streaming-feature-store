@@ -37,7 +37,7 @@ ENV PYTHONPATH=/app
 ENV MODEL_PATH=training/outputs/model.pkl
 ENV FEATURE_NAMES_PATH=training/outputs/feature_names.json
 ENV REDIS_HOST=redis
-ENV LOG_LEVEL=INFO
+ENV LOG_LEVEL=DEBUG
 
 EXPOSE 8080
 

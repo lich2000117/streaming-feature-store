@@ -13,23 +13,23 @@ down:       ## Stop all services and cleanup
 
 # === SERVICE MANAGEMENT ===
 generate:   ## Start event generators
-	docker compose -f infra/docker-compose.yml --profile generators up -d
+	docker compose -f infra/docker-compose.yml --profile generators up -d --build
 
 stream:     ## Start stream processing
-	docker compose -f infra/docker-compose.yml --profile streaming up -d
+	docker compose -f infra/docker-compose.yml --profile streaming up -d --build
 
 serve:      ## Start inference API
-	docker compose -f infra/docker-compose.yml --profile inference up -d
+	docker compose -f infra/docker-compose.yml --profile inference up -d --build
 	
 feast_up:      ## Start feature store server, and apply feature definitions
-	docker compose -f infra/docker-compose.yml --profile feast up -d
+	docker compose -f infra/docker-compose.yml --profile feast up -d --build
 	docker exec -it feast-server feast apply
 
 train:      ## Run ML training pipeline (with MLflow)
-	docker compose -f infra/docker-compose.yml up training-job -d
+	docker compose -f infra/docker-compose.yml up training-job -d --build
 
 monitor:    ## Start monitoring stack (prometheus, grafana)
-	docker compose -f infra/docker-compose.yml --profile monitoring up -d
+	docker compose -f infra/docker-compose.yml --profile monitoring up -d --build
 
 
 # === OBSERVABILITY ===

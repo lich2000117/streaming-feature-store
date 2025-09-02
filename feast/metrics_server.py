@@ -14,7 +14,6 @@ from typing import Dict, Any
 from prometheus_client import Counter, Histogram, Gauge, Info, start_http_server
 import feast
 from feast import FeatureStore
-from feast.infra.online_stores.redis import RedisOnlineStore
 
 logger = logging.getLogger(__name__)
 
@@ -108,11 +107,18 @@ class FeastMetricsCollector:
                 pass
                 
             # Update server info
+            online_store_type = "unknown"
+            try:
+                if hasattr(self.fs, 'online_store') and self.fs.online_store:
+                    online_store_type = type(self.fs.online_store).__name__
+            except Exception:
+                pass
+                
             FEAST_INFO.info({
                 'version': feast.__version__,
                 'project': self.fs.project,
                 'registry_type': type(registry).__name__,
-                'online_store_type': type(self.fs.online_store).__name__
+                'online_store_type': online_store_type
             })
             
             logger.debug("Collected Feast metrics successfully")

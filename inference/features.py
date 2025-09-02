@@ -21,7 +21,7 @@ import numpy as np
 from redis.exceptions import RedisError, ConnectionError, TimeoutError
 from prometheus_client import Counter, Gauge
 
-from config import InferenceConfig, FRAUD_FEATURE_MAPPING, PERSONALIZATION_FEATURE_MAPPING
+from config import InferenceConfig
 
 logger = logging.getLogger(__name__)
 
@@ -93,14 +93,15 @@ class FeatureStoreClient:
             self._last_health_check = time.time()
             
             logger.info(
-                "Connected to Redis feature store",
-                host=self.config.redis.host,
-                port=self.config.redis.port,
-                db=self.config.redis.db
+                "Connected to Redis feature store: host=%s, port=%d, db=%d",
+                self.config.redis.host,
+                self.config.redis.port,
+                self.config.redis.db
             )
+            print("DEBUG TEST: Redis connection established successfully")
             
         except Exception as e:
-            logger.error("Failed to connect to Redis", error=str(e))
+            logger.error("Failed to connect to Redis: %s", str(e))
             self._is_healthy = False
             raise
     
@@ -119,7 +120,7 @@ class FeatureStoreClient:
             else:
                 self._is_healthy = False
         except Exception as e:
-            logger.warning("Redis health check failed", error=str(e))
+            logger.warning("Redis health check failed: %s", str(e))
             self._is_healthy = False
         
         self._last_health_check = current_time
@@ -180,15 +181,15 @@ class FeatureStoreClient:
                 if 'feature_timestamp' in parsed_features:
                     feature_timestamp = parsed_features['feature_timestamp']
             
-            # Map features to expected names and add defaults for missing ones
+            # Add defaults for missing features and validate
             mapped_features = self._map_and_validate_features(
                 features, 
-                FRAUD_FEATURE_MAPPING,
+                {},  # No mapping needed
                 self.config.model.default_feature_values
             )
             
             # Identify missing features
-            expected_features = set(FRAUD_FEATURE_MAPPING.keys())
+            expected_features = set(self.config.model.default_feature_values.keys())
             available_features = set(mapped_features.keys())
             missing_features = list(expected_features - available_features)
             
@@ -205,7 +206,7 @@ class FeatureStoreClient:
                     
                     freshness_seconds = int((datetime.now() - feature_time).total_seconds())
                 except Exception as e:
-                    logger.warning("Failed to parse feature timestamp", error=str(e))
+                    logger.warning("Failed to parse feature timestamp: %s", str(e))
             
             # Cache the results
             self._feature_cache[cache_key] = (mapped_features, time.time())
@@ -225,25 +226,21 @@ class FeatureStoreClient:
                 retrieval_time_ms=(time.time() - start_time) * 1000
             )
             
-            logger.debug(
-                "Retrieved card features",
-                card_id=card_id,
-                feature_count=len(mapped_features),
-                missing_count=len(missing_features),
-                freshness_sec=freshness_seconds,
-                retrieval_ms=metadata.retrieval_time_ms
+            print(
+                "Retrieved card features: card_id=%s, feature_count=%d, missing_count=%d, freshness_sec=%d, retrieval_ms=%.2f",
+                card_id, len(mapped_features), len(missing_features), freshness_seconds, metadata.retrieval_time_ms
             )
             
             return mapped_features, metadata
             
         except (RedisError, ConnectionError, TimeoutError) as e:
-            logger.error("Redis error retrieving card features", card_id=card_id, error=str(e))
+            logger.error("Redis error retrieving card features for card_id=%s: %s", card_id, str(e))
             # Return default features on Redis error
             default_features = self.config.model.default_feature_values.copy()
             
             metadata = FeatureMetadata(
                 feature_count=len(default_features),
-                missing_features=list(FRAUD_FEATURE_MAPPING.keys()),
+                missing_features=list(self.config.model.default_feature_values.keys()),
                 freshness_seconds=0,
                 cache_hit=False,
                 retrieval_time_ms=(time.time() - start_time) * 1000
@@ -303,21 +300,23 @@ class FeatureStoreClient:
                 if 'feature_timestamp' in parsed_features:
                     feature_timestamp = parsed_features['feature_timestamp']
             
-            # Map features and add defaults
+            # Add defaults and validate
+            default_values = {
+                "session_duration_min": 0.0,
+                "pages_per_session": 1.0,
+                "click_rate_5m": 0.0,
+                "engagement_score": 0.5,
+                "is_high_engagement": False
+            }
+            
             mapped_features = self._map_and_validate_features(
                 features,
-                PERSONALIZATION_FEATURE_MAPPING,
-                {
-                    "session_duration_min": 0.0,
-                    "pages_per_session": 1.0,
-                    "click_rate_5m": 0.0,
-                    "engagement_score": 0.5,
-                    "is_high_engagement": False
-                }
+                {},  # No mapping needed
+                default_values
             )
             
             # Identify missing features
-            expected_features = set(PERSONALIZATION_FEATURE_MAPPING.keys())
+            expected_features = set(default_values.keys())
             available_features = set(mapped_features.keys())
             missing_features = list(expected_features - available_features)
             
@@ -348,18 +347,15 @@ class FeatureStoreClient:
                 retrieval_time_ms=(time.time() - start_time) * 1000
             )
             
-            logger.debug(
-                "Retrieved user features",
-                user_id=user_id,
-                feature_count=len(mapped_features),
-                missing_count=len(missing_features),
-                freshness_sec=freshness_seconds
+            print(
+                "Retrieved user features: user_id=%s, feature_count=%d, missing_count=%d, freshness_sec=%d",
+                user_id, len(mapped_features), len(missing_features), freshness_seconds
             )
             
             return mapped_features, metadata
             
         except (RedisError, ConnectionError, TimeoutError) as e:
-            logger.error("Redis error retrieving user features", user_id=user_id, error=str(e))
+            logger.error("Redis error retrieving user features for user_id=%s: %s", user_id, str(e))
             
             # Return default features
             default_features = {
@@ -372,7 +368,7 @@ class FeatureStoreClient:
             
             metadata = FeatureMetadata(
                 feature_count=len(default_features),
-                missing_features=list(PERSONALIZATION_FEATURE_MAPPING.keys()),
+                missing_features=["session_duration_min", "pages_per_session", "click_rate_5m", "engagement_score", "is_high_engagement"],
                 freshness_seconds=0,
                 cache_hit=False,
                 retrieval_time_ms=(time.time() - start_time) * 1000
@@ -409,16 +405,9 @@ class FeatureStoreClient:
                                   features: Dict[str, Any], 
                                   feature_mapping: Dict[str, str],
                                   defaults: Dict[str, Any]) -> Dict[str, Any]:
-        """Map Redis feature names to model feature names and add defaults."""
-        mapped_features = {}
-        
-        # Map existing features
-        for model_feature, redis_feature in feature_mapping.items():
-            if redis_feature in features:
-                mapped_features[model_feature] = features[redis_feature]
-            elif model_feature in features:
-                # Direct mapping if Redis uses the same name
-                mapped_features[model_feature] = features[model_feature]
+        """Add defaults for missing features and validate them."""
+        # Use features directly without mapping
+        mapped_features = features.copy()
         
         # Add defaults for missing features
         for feature_name, default_value in defaults.items():
@@ -461,10 +450,8 @@ class FeatureStoreClient:
                     
             except Exception as e:
                 logger.warning(
-                    "Feature validation failed",
-                    feature=feature_name,
-                    value=value,
-                    error=str(e)
+                    "Feature validation failed: feature=%s, value=%s, error=%s",
+                    feature_name, value, str(e)
                 )
                 # Use default value
                 validated[feature_name] = self.config.model.default_feature_values.get(feature_name, 0.0)
@@ -483,7 +470,7 @@ class FeatureStoreClient:
         for key in expired_keys:
             del self._feature_cache[key]
         
-        logger.debug("Cleaned up cache", expired_entries=len(expired_keys))
+        print("Cleaned up cache, expired_entries=%d", len(expired_keys))
     
     def get_cache_stats(self) -> Dict[str, Any]:
         """Get cache performance statistics."""

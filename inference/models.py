@@ -70,10 +70,8 @@ class SklearnModel(ModelInterface):
         self.prediction_count = 0
         
         logger.info(
-            "Loaded sklearn model",
-            model_type=type(model).__name__,
-            feature_count=len(feature_names),
-            version=self.model_version
+            "Loaded sklearn model: model_type=%s, feature_count=%d, version=%s",
+            type(model).__name__, len(feature_names), self.model_version
         )
     
     def predict(self, features: Dict[str, Any]) -> Tuple[float, Dict[str, Any]]:
@@ -113,16 +111,14 @@ class SklearnModel(ModelInterface):
             }
             
             logger.debug(
-                "Model prediction completed",
-                score=prediction_score,
-                inference_ms=inference_time_ms,
-                feature_count=len(feature_vector)
+                "Model prediction completed: score=%.4f, inference_ms=%.2f, feature_count=%d",
+                prediction_score, inference_time_ms, len(feature_vector)
             )
             
             return prediction_score, metadata
             
         except Exception as e:
-            logger.error("Model prediction failed", error=str(e))
+            logger.error("Model prediction failed: %s", str(e))
             # Return default prediction
             return 0.5, {
                 "model_type": "error",
@@ -165,16 +161,14 @@ class SklearnModel(ModelInterface):
             self.prediction_count += len(features_list)
             
             logger.debug(
-                "Batch prediction completed",
-                batch_size=len(features_list),
-                total_time_ms=batch_time_ms,
-                avg_time_per_pred_ms=avg_time_per_prediction
+                "Batch prediction completed: batch_size=%d, total_time_ms=%.2f, avg_time_per_pred_ms=%.2f",
+                len(features_list), batch_time_ms, avg_time_per_prediction
             )
             
             return results
             
         except Exception as e:
-            logger.error("Batch prediction failed", error=str(e))
+            logger.error("Batch prediction failed: %s", str(e))
             # Return default predictions
             error_metadata = {
                 "model_type": "error",
@@ -253,12 +247,8 @@ class ONNXModel(ModelInterface):
         self.output_name = self.session.get_outputs()[0].name
         
         logger.info(
-            "Loaded ONNX model",
-            model_path=onnx_path,
-            feature_count=len(feature_names),
-            version=self.model_version,
-            input_name=self.input_name,
-            output_name=self.output_name
+            "Loaded ONNX model: model_path=%s, feature_count=%d, version=%s, input_name=%s, output_name=%s",
+            onnx_path, len(feature_names), self.model_version, self.input_name, self.output_name
         )
     
     def predict(self, features: Dict[str, Any]) -> Tuple[float, Dict[str, Any]]:
@@ -292,15 +282,14 @@ class ONNXModel(ModelInterface):
             }
             
             logger.debug(
-                "ONNX prediction completed",
-                score=prediction_score,
-                inference_ms=inference_time_ms
+                "ONNX prediction completed: score=%.4f, inference_ms=%.2f",
+                prediction_score, inference_time_ms
             )
             
             return prediction_score, metadata
             
         except Exception as e:
-            logger.error("ONNX prediction failed", error=str(e))
+            logger.error("ONNX prediction failed: %s", str(e))
             return 0.5, {
                 "model_type": "onnx_error",
                 "model_version": self.model_version,
@@ -346,15 +335,14 @@ class ONNXModel(ModelInterface):
             self.prediction_count += len(features_list)
             
             logger.debug(
-                "ONNX batch prediction completed",
-                batch_size=len(features_list),
-                total_time_ms=batch_time_ms
+                "ONNX batch prediction completed: batch_size=%d, total_time_ms=%.2f",
+                len(features_list), batch_time_ms
             )
             
             return results
             
         except Exception as e:
-            logger.error("ONNX batch prediction failed", error=str(e))
+            logger.error("ONNX batch prediction failed: %s", str(e))
             error_metadata = {
                 "model_type": "onnx_error",
                 "model_version": self.model_version,
@@ -500,14 +488,14 @@ class ModelManager:
 def interpret_fraud_prediction(prediction_score: float, features: Dict[str, Any], metadata: Dict[str, Any]) -> Dict[str, Any]:
     """Generate human-readable interpretation of fraud prediction."""
     
-    # Determine risk level
-    if prediction_score >= 0.8:
+    # Determine risk level (aligned with model output distribution)
+    if prediction_score >= 0.7:
         risk_level = "critical"
         recommended_action = "block"
-    elif prediction_score >= 0.6:
+    elif prediction_score >= 0.4:
         risk_level = "high"
         recommended_action = "review"
-    elif prediction_score >= 0.3:
+    elif prediction_score >= 0.15:
         risk_level = "medium"
         recommended_action = "review"
     else:

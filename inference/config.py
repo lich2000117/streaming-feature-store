@@ -55,9 +55,22 @@ class ModelConfig(BaseModel):
     default_feature_values: Dict[str, Any] = Field(
         default_factory=lambda: {
             "txn_count_5m": 0,
+            "txn_count_30m": 0,
+            "txn_count_24h": 0,
             "amount_avg_5m": 0.0,
+            "amount_sum_5m": 0.0,
+            "amount_max_5m": 0.0,
+            "amount_std_5m": 0.0,
+            "unique_countries_5m": 1,
+            "geo_diversity_score": 0.0,
+            "time_since_last_txn_min": 0.0,
+            "is_weekend": False,
+            "hour_of_day": 12,
             "velocity_score": 0.0,
-            "geo_diversity_score": 0.0
+            "high_risk_txn_ratio": 0.0,
+            "has_high_risk_mcc": False,
+            "is_high_velocity": False,
+            "is_geo_diverse": False
         },
         description="Default values for missing features"
     )
@@ -94,7 +107,7 @@ class APIConfig(BaseModel):
 class LoggingConfig(BaseModel):
     """Logging configuration."""
     
-    level: str = Field(default="INFO", description="Log level")
+    level: str = Field(default="DEBUG", description="Log level")
     format: str = Field(default="json", description="Log format: json or text")
     
     # Structured logging fields
@@ -196,36 +209,4 @@ class InferenceConfig(BaseModel):
         return True
 
 
-# Feature name mappings for different model types
-FRAUD_FEATURE_MAPPING = {
-    "txn_count_5m": "transaction_count_5min",
-    "txn_count_30m": "transaction_count_30min", 
-    "amount_avg_5m": "amount_average_5min",
-    "amount_sum_5m": "amount_sum_5min",
-    "amount_max_5m": "amount_max_5min",
-    "amount_std_5m": "amount_std_5min",
-    "unique_countries_5m": "unique_countries_5min",
-    "geo_diversity_score": "geo_diversity_score",
-    "time_since_last_txn_min": "time_since_last_transaction_minutes",
-    "is_weekend": "is_weekend",
-    "hour_of_day": "hour_of_day",
-    "velocity_score": "velocity_score",
-    "high_risk_txn_ratio": "high_risk_transaction_ratio",
-    "is_high_velocity": "is_high_velocity",
-    "is_geo_diverse": "is_geo_diverse",
-    "has_high_risk_mcc": "has_high_risk_mcc"
-}
-
-PERSONALIZATION_FEATURE_MAPPING = {
-    "session_duration_min": "session_duration_minutes",
-    "pages_per_session": "pages_per_session",
-    "unique_categories_session": "unique_categories_per_session",
-    "avg_dwell_time_sec": "average_dwell_time_seconds",
-    "avg_scroll_depth": "average_scroll_depth",
-    "click_rate_5m": "click_rate_5min",
-    "cart_adds_session": "cart_additions_per_session",
-    "conversion_rate_session": "conversion_rate_per_session",
-    "engagement_score": "engagement_score",
-    "is_high_engagement": "is_high_engagement",
-    "is_likely_purchaser": "is_likely_purchaser"
-}
+# Feature names are used directly from Redis without mapping

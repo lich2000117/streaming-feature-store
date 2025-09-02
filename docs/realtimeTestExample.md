@@ -11,7 +11,7 @@ curl -X POST http://localhost:8080/score/fraud \
 ```bash
 curl -X POST http://localhost:8080/score/fraud \
   -H "Content-Type: application/json" \
-  -d '{"card_id": "card_00030479", "transaction_amount": 5000.0, "mcc_code": "6011"}'
+  -d '{"card_id": "card_00030479", "transaction_amount": 5000.0, "mcc_code": "6011"}' | grep "score"
 ```
 
 ### **3. Personalization**

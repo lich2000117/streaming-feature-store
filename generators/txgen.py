@@ -35,7 +35,7 @@ class TransactionGenerator(BaseEventGenerator, TimestampMixin):
     
     def __init__(self, **kwargs):
         # Extract fraud injection rate
-        self.fraud_rate = kwargs.pop('fraud_rate', 0.14)  # 14% fraud rate
+        self.fraud_rate = kwargs.pop('fraud_rate', 0.05)  # 5% fraud rate
         
         super().__init__(
             topic="txn.events",
@@ -129,6 +129,7 @@ class TransactionGenerator(BaseEventGenerator, TimestampMixin):
             'geo_lon': geo_info.get('lon'),
             'timestamp': self.current_timestamp_ms(),
             'processing_time': None,  # Will be set by producer
+            'is_fraud': is_fraud,  # Store ground truth fraud label
             'metadata': self._generate_metadata(is_fraud, category)
         }
         

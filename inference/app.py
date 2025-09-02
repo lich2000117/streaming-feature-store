@@ -38,7 +38,6 @@ from models import ModelManager, interpret_fraud_prediction, interpret_personali
 # Configure structured logging
 structlog.configure(
     processors=[
-        structlog.stdlib.filter_by_level,
         structlog.stdlib.add_logger_name,
         structlog.stdlib.add_log_level,
         structlog.processors.TimeStamper(fmt="iso"),
@@ -102,7 +101,16 @@ async def lifespan(app: FastAPI):
     logger.info("Starting Streaming Feature Store Inference Service")
     try:
         config = InferenceConfig.from_env()
-        logger.info("Configuration loaded", environment=getattr(config, "environment", "unknown"))
+        
+        # Configure Python logging level for structlog filter_by_level
+        log_level = getattr(config.logging, 'level', 'INFO').upper()
+        logging.getLogger().setLevel(getattr(logging, log_level, logging.INFO))
+        
+        # Set specific loggers to DEBUG level
+        logging.getLogger('inference.features').setLevel(getattr(logging, log_level, logging.INFO))
+        logging.getLogger('inference.models').setLevel(getattr(logging, log_level, logging.INFO))
+        
+        logger.info("Configuration loaded", environment=getattr(config, "environment", "unknown"), log_level=log_level)
 
         if hasattr(config, "validate_paths") and not config.validate_paths():
             raise ValueError("Required model files not found")
@@ -225,7 +233,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         request_id=request_id
     )
     payload = ErrorResponse(error=error_detail)
-    return JSONResponse(status_code=422, content=payload.model_dump())
+    return JSONResponse(status_code=422, content=payload.model_dump(mode='json'))
 
 
 @app.exception_handler(HTTPException)
@@ -242,7 +250,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         request_id=request_id
     )
     payload = ErrorResponse(error=error_detail)
-    return JSONResponse(status_code=exc.status_code, content=payload.model_dump())
+    return JSONResponse(status_code=exc.status_code, content=payload.model_dump(mode='json'))
 
 
 def get_request_id(request: Request) -> str:
@@ -346,7 +354,7 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
         feature_start = time.perf_counter()
         features, feature_metadata = feature_client.get_card_features(request.card_id)
         FEATURE_FETCH_DURATION.observe(time.perf_counter() - feature_start)
-
+        print("features", features)
         if request.transaction_amount is not None:
             features["transaction_amount"] = request.transaction_amount
         if request.mcc_code:
@@ -362,6 +370,17 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
 
         latency_ms = (time.perf_counter() - start_time) * 1000.0
 
+        # Check for ground truth to validate prediction accuracy
+        actual_fraud = features.get('actual_fraud')
+        predicted_fraud = prediction_score > 0.5
+        accuracy_info = {}
+        if actual_fraud is not None:
+            accuracy_info = {
+                "actual_fraud": actual_fraud,
+                "predicted_fraud": predicted_fraud,
+                "correct_prediction": (actual_fraud == predicted_fraud)
+            }
+
         logger.info(
             "Fraud score computed",
             request_id=request_id,
@@ -371,6 +390,7 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
             latency_ms=latency_ms,
             features_count=getattr(feature_metadata, "feature_count", len(features)),
             cache_hit=getattr(feature_metadata, "cache_hit", False),
+            **accuracy_info
         )
 
         return FraudScoreResponse(

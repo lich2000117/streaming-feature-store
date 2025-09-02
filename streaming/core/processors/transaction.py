@@ -71,10 +71,11 @@ class TransactionFeatureComputer:
                 time_since_last = None
                 avg_time_between = None
                 
-            # Risk indicators
-            high_risk_mccs = ['6011', '7995', '5967']
+            # Risk indicators (aligned with generator fraud_likelihood >= 0.2)
+            high_risk_mccs = ['6011', '5967', '7011', '5311']  # atm, online, hotel, retail
             high_risk_txns = sum(1 for e in window_events if e[1].get('mcc') in high_risk_mccs)
             risk_ratio = high_risk_txns / len(window_events)
+            has_high_risk_mcc = risk_ratio > 0
             
             # Velocity features
             velocity_score = 0.0
@@ -90,6 +91,17 @@ class TransactionFeatureComputer:
                 mean = amount_avg
                 variance = sum((x - mean) ** 2 for x in amounts) / len(amounts)
                 std_dev = variance ** 0.5
+                
+            # Time-based features
+            current_time = datetime.fromtimestamp(timestamp / 1000)
+            is_weekend = current_time.weekday() >= 5
+            hour_of_day = current_time.hour
+            
+            # Compute 30m and 24h windows for additional features
+            window_30m = [e for e in window_events if (timestamp - e[0]) <= (30 * 60 * 1000)]
+            window_24h = [e for e in window_events if (timestamp - e[0]) <= (24 * 60 * 60 * 1000)]
+            txn_count_30m = len(window_30m)
+            txn_count_24h = len(window_24h)
             
             # Create feature record
             features = {
@@ -99,6 +111,8 @@ class TransactionFeatureComputer:
                 
                 # Count features
                 'txn_count_5m': txn_count,
+                'txn_count_30m': txn_count_30m,
+                'txn_count_24h': txn_count_24h,
                 
                 # Amount features
                 'amount_sum_5m': round(amount_sum, 2),
@@ -114,12 +128,18 @@ class TransactionFeatureComputer:
                 # Temporal features
                 'time_since_last_txn_min': round(time_since_last, 2) if time_since_last else None,
                 'avg_time_between_txns_min': round(avg_time_between, 2) if avg_time_between else None,
+                'is_weekend': is_weekend,
+                'hour_of_day': hour_of_day,
                 'velocity_score': round(velocity_score, 3),
                 
                 # Risk features
                 'high_risk_txn_ratio': round(risk_ratio, 3),
+                'has_high_risk_mcc': has_high_risk_mcc,
                 'is_high_velocity': velocity_score > 0.7,
                 'is_geo_diverse': unique_countries > 2,
+                
+                # Ground truth (if available from current event)
+                'actual_fraud': event.get('is_fraud'),  # Store ground truth for validation
                 
                 # Metadata
                 'window_size_minutes': self.config.window_size_minutes,
@@ -190,8 +210,8 @@ def compute_transaction_features_from_window(events: list, config: ProcessorConf
     time_span_minutes = (timestamps[-1] - timestamps[0]) / (1000 * 60) if len(timestamps) > 1 else 0
     avg_time_between_txns = time_span_minutes / max(txn_count - 1, 1)
     
-    # Risk indicators
-    high_risk_mccs = ['6011', '7995', '5967']
+    # Risk indicators (aligned with generator fraud_likelihood >= 0.2)
+    high_risk_mccs = ['6011', '5967', '7011', '5311']  # atm, online, hotel, retail
     high_risk_count = sum(1 for mcc in mccs if mcc in high_risk_mccs)
     high_risk_ratio = high_risk_count / txn_count if txn_count > 0 else 0
     

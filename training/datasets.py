@@ -56,8 +56,13 @@ class FeatureStoreDataset:
         # Convert to DataFrame
         df = pd.DataFrame(card_features)
         
-        # Generate fraud labels
-        df = self._generate_fraud_labels(df)
+        # Use ground truth fraud labels if available, otherwise generate them
+        if 'actual_fraud' in df.columns:
+            logger.info("Using ground truth fraud labels from transaction generator")
+            df['is_fraud'] = df['actual_fraud'].fillna(False)
+        else:
+            logger.info("Ground truth not available, abort")
+            raise ValueError("Ground truth not available, aborting dataset creation")
         
         # Validate data quality
         df = self._validate_data_quality(df)
@@ -137,53 +142,6 @@ class FeatureStoreDataset:
                     
         return parsed
     
-    def _generate_fraud_labels(self, df: pd.DataFrame) -> pd.DataFrame:
-        """Generate fraud labels based on feature patterns."""
-        logger.info("Generating fraud labels based on feature patterns")
-        
-        # Initialize fraud labels
-        df['is_fraud'] = False
-        
-        # Rule-based fraud detection for synthetic labels
-        fraud_conditions = [
-            # High velocity transactions
-            (df['velocity_score'] > 0.8) & (df['txn_count_5m'] > 5),
-            
-            # Geographic anomalies
-            (df['geo_diversity_score'] > 0.7) & (df['unique_countries_5m'] > 2),
-            
-            # High-risk merchant categories
-            df['has_high_risk_mcc'] & (df['amount_avg_5m'] > 500),
-            
-            # Unusual timing patterns
-            df['is_weekend'] & (df.get('hour_of_day', 12) < 6),  # Late night weekend
-            
-            # Amount anomalies
-            (df['amount_max_5m'] > 1000) & (df['txn_count_5m'] == 1),  # Single large transaction
-        ]
-        
-        # Apply fraud rules with different weights
-        fraud_scores = np.zeros(len(df))
-        weights = [0.4, 0.3, 0.2, 0.1, 0.3]  # Different importance weights
-        
-        for condition, weight in zip(fraud_conditions, weights):
-            fraud_scores += condition.astype(float) * weight
-        
-        # Set fraud threshold to achieve target fraud rate
-        target_fraud_count = int(len(df) * self.config.data.fraud_rate_target)
-        fraud_threshold = np.sort(fraud_scores)[-target_fraud_count] if target_fraud_count > 0 else 1.0
-        
-        df['is_fraud'] = fraud_scores >= fraud_threshold
-        df['fraud_score'] = fraud_scores
-        
-        # Add some randomness to make it more realistic
-        random_fraud = np.random.random(len(df)) < 0.005  # 0.5% random fraud
-        df['is_fraud'] = df['is_fraud'] | random_fraud
-        
-        fraud_rate = df['is_fraud'].mean()
-        logger.info(f"Generated fraud labels: {fraud_rate:.2%} fraud rate")
-        
-        return df
     
     def _validate_data_quality(self, df: pd.DataFrame) -> pd.DataFrame:
         """Validate and clean data quality issues."""

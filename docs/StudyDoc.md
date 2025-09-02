@@ -709,3 +709,8 @@ Key Differentiators:
 ## Microservices
 
 Each service has theri own dockerfile and requirements, use docker compose and make file to orchestrate
+
+
+## Problems Encountered when everything is correct
+
+ML model at test and training performs really well, but at the deployment, real time fraud detection it cannot detect real fraud, 

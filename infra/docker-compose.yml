@@ -135,7 +135,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - MODEL_VERSION=v1
-      - LOG_LEVEL=INFO
+      - LOG_LEVEL=DEBUG
     depends_on:
       redis:
         condition: service_healthy

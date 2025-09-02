@@ -15,6 +15,7 @@ from pathlib import Path
 class DataConfig(BaseModel):
     """Data configuration for training."""
     
+    # NOTE, edit parameter at @train.py
     # Redis connection for feature store
     redis_host: str = Field(default="localhost", description="Redis host for feature store")
     redis_port: int = Field(default=6379, description="Redis port")
