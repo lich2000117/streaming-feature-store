@@ -3,6 +3,7 @@
 # === CORE INFRASTRUCTURE ===
 up:         ## Start core infrastructure (kafka, redis, schema-registry, mlflow)
 	docker compose -f infra/docker-compose.yml up -d
+	@echo "✅ Infra ready!"
 
 up-all:     ## Start complete platform (all services)
 	docker compose -f infra/docker-compose.yml --profile all up -d
@@ -12,23 +13,23 @@ down:       ## Stop all services and cleanup
 
 # === SERVICE MANAGEMENT ===
 generate:   ## Start event generators
-	docker compose -f infra/docker-compose.yml --profile generators up -d --build
+	docker compose -f infra/docker-compose.yml --profile generators up -d
 
 stream:     ## Start stream processing
-	docker compose -f infra/docker-compose.yml --profile streaming up -d --build
+	docker compose -f infra/docker-compose.yml --profile streaming up -d
 
 serve:      ## Start inference API
-	docker compose -f infra/docker-compose.yml --profile inference up -d --build
+	docker compose -f infra/docker-compose.yml --profile inference up -d
 	
 feast_up:      ## Start feature store server, and apply feature definitions
-	docker compose -f infra/docker-compose.yml --profile feast up -d --build
+	docker compose -f infra/docker-compose.yml --profile feast up -d
 	docker exec -it feast-server feast apply
 
 train:      ## Run ML training pipeline (with MLflow)
-	docker compose -f infra/docker-compose.yml up training-job --build
+	docker compose -f infra/docker-compose.yml up training-job -d
 
 monitor:    ## Start monitoring stack (prometheus, grafana)
-	docker compose -f infra/docker-compose.yml --profile monitoring restart
+	docker compose -f infra/docker-compose.yml --profile monitoring up -d
 
 
 # === OBSERVABILITY ===
@@ -58,6 +59,11 @@ logs-grafana:   ## View inference API logs
 	docker compose -f infra/docker-compose.yml logs -f grafana
 
 # === DATA INSPECTION ===
+test:
+	@make test-api
+	@make inspect
+	@make health
+
 health:     ## Check service health status
 	@echo "=== 🏥 Health Check ==="
 	@echo "📊 Kafka:"
@@ -90,12 +96,13 @@ test-api:       ## Test inference API endpoints
 		-H "Content-Type: application/json" \
 		-d '{"user_id": "user_00005678", "item_id": "item_electronics_001"}' | jq .
 
-# === DEVELOPMENT ===
-build:      ## Build all service images
-	docker compose -f infra/docker-compose.yml build
 
-rebuild:    ## Rebuild all images from scratch
-	docker compose -f infra/docker-compose.yml build --no-cache
+# === IMAGE MANAGEMENT ===
+build: ## Build all service images
+	docker compose -f infra/docker-compose.yml --profile all build
+
+rebuild: ## Rebuild all images from scratch
+	docker compose -f infra/docker-compose.yml --profile all build --no-cache
 
 clean:      ## Complete cleanup (containers, volumes, images)
 	docker compose -f infra/docker-compose.yml --profile all down -v --remove-orphans
@@ -105,18 +112,36 @@ clean:      ## Complete cleanup (containers, volumes, images)
 demo:       ## 🎬 Complete demo setup
 	@echo "🚀 Starting Streaming Feature Store Demo..."
 	@echo "⚙️  Starting infrastructure..."
+	@echo "If you want to rebuild the images, run 'make rebuild'"
+	@make rebuild
+	@sleep 5
+	@echo "🔄 Starting services..."
 	@make up
+	@sleep 5
 	@echo "⏳ Waiting for services..."
 	@sleep 10
 	@echo "🚀 Starting inference API..."
 	@make serve
 	@sleep 5
-	@echo "✅ Demo ready! Try these commands:"
-	@echo "  make generate    # Start event generators"
-	@echo "  make stream      # Start feature processing"
-	@echo "  make train       # Run ML training pipeline"
-	@echo "  make test        # Test the API"
-	@echo "  make inspect     # View live data"
+	@echo "🚀 Starting monitoring..."
+	@make monitor
+	@sleep 5
+	@echo "🚀 Starting generators..."
+	@make generate
+	@sleep 5
+	@echo "🚀 Starting stream processor..."
+	@make stream
+	@sleep 5
+	@echo "🚀 Starting feast server..."
+	@make feast_up
+	@sleep 5
+	@echo "🚀 Starting training job..."
+	@make train
+	@sleep 5
+	@echo "You can visit the dashboards with: make urls"
+	@make urls
+	@sleep 5
+	@echo "You can then test the API with: make test-api"
 
 urls:       ## Show service URLs
 	@echo "🌐 Service URLs:"

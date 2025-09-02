@@ -716,7 +716,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "avg_over_time(prediction_scores{model_type=\"fraud\"}[5m])",
+          "expr": "avg_over_time(fraud_score_distribution_bucket[5m])",
           "legendFormat": "Fraud Scores",
           "range": true,
           "refId": "A"

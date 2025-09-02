@@ -32,7 +32,7 @@ from schemas import (
     HealthResponse, ReadinessResponse, ErrorResponse, ErrorDetail,
     HealthStatus, ModelType
 )
-from features import FeatureStoreClient, FeatureMetadata
+from features import FeatureStoreClient, FeatureMetadata, FEATURE_CACHE_HITS, FEATURE_CACHE_MISSES, FEATURE_FRESHNESS
 from models import ModelManager, interpret_fraud_prediction, interpret_personalization_prediction
 
 # Configure structured logging
@@ -89,6 +89,9 @@ ERROR_COUNT = Counter(
     'Total errors',
     ['error_type', 'endpoint']
 )
+
+# Note: Feature cache and freshness metrics are defined in features.py
+# to avoid duplicate registration conflicts
 
 
 @asynccontextmanager

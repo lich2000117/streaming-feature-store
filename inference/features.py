@@ -19,10 +19,28 @@ from dataclasses import dataclass
 import redis
 import numpy as np
 from redis.exceptions import RedisError, ConnectionError, TimeoutError
+from prometheus_client import Counter, Gauge
 
 from config import InferenceConfig, FRAUD_FEATURE_MAPPING, PERSONALIZATION_FEATURE_MAPPING
 
 logger = logging.getLogger(__name__)
+
+# Prometheus metrics for feature operations
+FEATURE_CACHE_HITS = Counter(
+    'feature_cache_hits_total',
+    'Total feature cache hits',
+    ['entity_type']
+)
+FEATURE_CACHE_MISSES = Counter(
+    'feature_cache_misses_total',
+    'Total feature cache misses',
+    ['entity_type']
+)
+FEATURE_FRESHNESS = Gauge(
+    'feature_freshness_seconds',
+    'Age of features in seconds',
+    ['entity_type', 'feature_view']
+)
 
 
 @dataclass
@@ -125,6 +143,7 @@ class FeatureStoreClient:
             cached_features, cache_time = self._feature_cache[cache_key]
             if time.time() - cache_time < self.config.redis.feature_cache_ttl:
                 self._cache_hits += 1
+                FEATURE_CACHE_HITS.labels(entity_type='card').inc()
                 
                 metadata = FeatureMetadata(
                     feature_count=len(cached_features),
@@ -140,6 +159,7 @@ class FeatureStoreClient:
                 del self._feature_cache[cache_key]
         
         self._cache_misses += 1
+        FEATURE_CACHE_MISSES.labels(entity_type='card').inc()
         
         # Retrieve from Redis
         features = {}
@@ -194,6 +214,9 @@ class FeatureStoreClient:
             if len(self._feature_cache) > 10000:
                 self._cleanup_cache()
             
+            # Record feature freshness metric
+            FEATURE_FRESHNESS.labels(entity_type='card', feature_view='transaction').set(freshness_seconds)
+            
             metadata = FeatureMetadata(
                 feature_count=len(mapped_features),
                 missing_features=missing_features,
@@ -246,6 +269,7 @@ class FeatureStoreClient:
             cached_features, cache_time = self._feature_cache[cache_key]
             if time.time() - cache_time < self.config.redis.feature_cache_ttl:
                 self._cache_hits += 1
+                FEATURE_CACHE_HITS.labels(entity_type='user').inc()
                 
                 metadata = FeatureMetadata(
                     feature_count=len(cached_features),
@@ -260,6 +284,7 @@ class FeatureStoreClient:
                 del self._feature_cache[cache_key]
         
         self._cache_misses += 1
+        FEATURE_CACHE_MISSES.labels(entity_type='user').inc()
         
         # Retrieve from Redis
         features = {}
@@ -311,6 +336,9 @@ class FeatureStoreClient:
             
             # Cache results
             self._feature_cache[cache_key] = (mapped_features, time.time())
+            
+            # Record feature freshness metric
+            FEATURE_FRESHNESS.labels(entity_type='user', feature_view='clickstream').set(freshness_seconds)
             
             metadata = FeatureMetadata(
                 feature_count=len(mapped_features),

@@ -20,6 +20,7 @@ import os
 import sys
 import json
 import logging
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional, List, Tuple
 
@@ -58,6 +59,13 @@ FEATURES_COMPUTED = Counter('flink_features_computed_total', 'Total features com
 PROCESSING_LATENCY = Histogram('flink_processing_latency_seconds', 'Processing latency', ['stage'])
 WATERMARK_LAG = Gauge('flink_watermark_lag_seconds', 'Watermark lag behind wall clock')
 DLQ_EVENTS = Counter('flink_dlq_events_total', 'Events sent to DLQ', ['reason'])
+
+# Kafka consumer lag metric (same as simple processor)
+KAFKA_CONSUMER_LAG = Gauge(
+    'kafka_consumer_lag_sum',
+    'Kafka consumer lag in messages',
+    ['topic', 'partition', 'consumer_group']
+)
 
 
 # Flink Functions
@@ -324,6 +332,77 @@ def create_watermark_strategy(delay_ms: int):
         .with_timestamp_assigner(lambda event, timestamp: event['timestamp'])
 
 
+class KafkaLagTracker(MapFunction):
+    """Track Kafka consumer lag metrics for Flink job."""
+    
+    def __init__(self, config: FeatureJobConfig):
+        self.config = config
+        self.kafka_admin = None
+        self._last_lag_check = 0
+        self._lag_check_interval = 30  # Check lag every 30 seconds
+        
+    def open(self, runtime_context):
+        """Initialize Kafka admin client for lag tracking."""
+        try:
+            from kafka import KafkaAdminClient
+            self.kafka_admin = KafkaAdminClient(
+                bootstrap_servers=self.config.kafka_bootstrap_servers
+            )
+        except Exception as e:
+            logger.warning("Failed to initialize Kafka admin client", error=str(e))
+    
+    def map(self, value):
+        """Update lag metrics periodically."""
+        try:
+            current_time = time.time()
+            if current_time - self._last_lag_check < self._lag_check_interval:
+                return value
+                
+            if self.kafka_admin:
+                # Get consumer group information
+                consumer_groups = self.kafka_admin.describe_consumer_groups([self.config.consumer_group])
+                
+                for group_id, group_info in consumer_groups.items():
+                    if group_info.members:
+                        for member in group_info.members:
+                            for topic_partition in member.assignment:
+                                try:
+                                    # Get high water mark
+                                    high_water_mark = self.kafka_admin.get_watermark_offsets(
+                                        topic_partition.topic, 
+                                        topic_partition.partition
+                                    )[1]
+                                    
+                                    # Get committed offset
+                                    committed_offset = self.kafka_admin.get_committed_offsets(
+                                        [topic_partition], 
+                                        group_id
+                                    )[topic_partition]
+                                    
+                                    # Calculate lag
+                                    lag = high_water_mark - (committed_offset or 0) if high_water_mark and committed_offset else 0
+                                    
+                                    # Update metric
+                                    KAFKA_CONSUMER_LAG.labels(
+                                        topic=topic_partition.topic,
+                                        partition=str(topic_partition.partition),
+                                        consumer_group=group_id
+                                    ).set(lag)
+                                    
+                                except Exception as e:
+                                    logger.warning("Failed to get lag for partition", 
+                                                 topic=topic_partition.topic, 
+                                                 partition=topic_partition.partition, 
+                                                 error=str(e))
+                
+                self._last_lag_check = current_time
+                
+        except Exception as e:
+            logger.warning("Failed to update consumer lag metrics", error=str(e))
+            
+        return value
+
+
 def setup_flink_job(config: FeatureJobConfig) -> StreamExecutionEnvironment:
     """Set up Flink execution environment."""
     
@@ -409,8 +488,13 @@ def main(config: FeatureJobConfig):
     # Union feature streams
     all_features = transaction_features.union(clickstream_features)
     
+    # Add lag tracking to the pipeline
+    features_with_lag_tracking = all_features \
+        .map(KafkaLagTracker(config)) \
+        .set_parallelism(1)  # Single instance for lag tracking
+    
     # Sink to Redis
-    redis_results = all_features \
+    redis_results = features_with_lag_tracking \
         .map(RedisFeatureSink(config)) \
         .set_parallelism(config.sink_parallelism)
     

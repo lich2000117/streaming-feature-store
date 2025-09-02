@@ -54,10 +54,27 @@ services:
       - mlflow_data:/mlartifacts
     ports: [ "5001:5001" ]
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:5001/health || exit 1"]
+      test: ["CMD", "python", "-c", "import socket; s=socket.socket(); s.connect(('127.0.0.1',5001))"]
       interval: 10s
-      timeout: 30s
+      timeout: 10s
       retries: 5
+
+
+
+  # MLflow metrics exporter
+  mlflow-metrics:
+    build:
+      context: ..
+      dockerfile: training/Dockerfile
+    container_name: mlflow-metrics
+    ports: [ "8568:8568" ]
+    environment:
+      - MLFLOW_TRACKING_URI=http://mlflow:5001
+    command: ["python", "mlflow_metrics.py", "--port", "8568", "--tracking-uri", "http://mlflow:5001"]
+    depends_on:
+      mlflow:
+        condition: service_healthy
+    profiles: ["monitoring", "all"]
 
 
   # === GENERATORS ===
@@ -135,7 +152,7 @@ services:
       context: ..
       dockerfile: feast/Dockerfile
     container_name: feast-server
-    ports: [ "6566:6566" ]
+    ports: [ "6566:6566", "8567:8567" ]  # Add metrics port
     environment:
       - REDIS_HOST=redis
       - REDIS_PORT=6379

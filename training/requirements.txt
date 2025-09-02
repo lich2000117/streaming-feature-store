@@ -6,6 +6,9 @@ lightgbm==4.3.0
 # MLflow for experiment tracking and model registry
 mlflow==2.10.2
 
+# Monitoring and metrics
+prometheus-client==0.20.0
+
 # Model serving - Fixed versions for compatibility
 onnxmltools==1.12.0
 skl2onnx==1.16.0

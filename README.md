@@ -134,7 +134,9 @@ make monitor
 
 * Prometheus: [http://localhost:9090](http://localhost:9090)
 * Grafana:    [http://localhost:3000](http://localhost:3000) (default admin/admin123)
-* MLflow:     [http://localhost:5000](http://localhost:5000)
+  - **Real-Time Fraud Detection Dashboard**: Monitor live fraud detection rates, blocked transactions, and fraud score distributions
+  - **MLflow & Training Dashboard**: Track model training, experiments, and performance metrics
+* MLflow:     [http://localhost:5001](http://localhost:5001)
 * Flink UI:   [http://localhost:8083](http://localhost:8083)
 
 ---

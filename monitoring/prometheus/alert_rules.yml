@@ -230,15 +230,39 @@ groups:
     rules:
       # Abnormally high fraud rate
       - alert: HighFraudRate
-        expr: avg_over_time(fraud_prediction_scores[1h]) > 0.1
-        for: 15m
+        expr: fraud_rate_current > 0.1
+        for: 5m
         labels:
           severity: warning
-          service: inference-api
+          service: stream-processor
           type: business
         annotations:
           summary: "Fraud detection rate is unusually high"
-          description: "Average fraud score over the last hour is {{ $value | humanizePercentage }}, above normal baseline."
+          description: "Current fraud detection rate is {{ $value | humanizePercentage }}, above normal baseline of 10%."
+
+      # Critical fraud detection
+      - alert: CriticalFraudDetected
+        expr: rate(fraud_detections_total{risk_level="critical"}[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+          service: stream-processor
+          type: security
+        annotations:
+          summary: "Critical fraud detected in real-time"
+          description: "{{ $value }} critical fraud cases detected per minute. Immediate investigation required."
+
+      # High number of blocked transactions
+      - alert: HighBlockedTransactions
+        expr: rate(blocked_transactions_total[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          service: stream-processor
+          type: business
+        annotations:
+          summary: "High number of blocked transactions"
+          description: "{{ $value }} transactions are being blocked per minute due to fraud detection."
 
       # Low prediction confidence
       - alert: LowModelConfidence

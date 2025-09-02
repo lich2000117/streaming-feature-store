@@ -73,13 +73,16 @@ scrape_configs:
       - source_labels: [__address__]
         target_label: component
         replacement: 'ml-serving'
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'inference-api:8080'
 
   # Stream Processing Service
   - job_name: 'stream-processor'
     static_configs:
       - targets: ['stream-processor:8000']
     metrics_path: /metrics
-    scrape_interval: 15s
+    scrape_interval: 5s  # More frequent for fraud detection metrics
     relabel_configs:
       - source_labels: [__address__]
         target_label: service
@@ -87,6 +90,9 @@ scrape_configs:
       - source_labels: [__address__]
         target_label: component
         replacement: 'feature-engineering'
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'stream-processor:8000'
 
   # Event Generators monitoring
   - job_name: 'event-generators'
@@ -104,27 +110,35 @@ scrape_configs:
 
   # === ML PIPELINE MONITORING ===
 
-  # MLflow Tracking Server (disabled - MLflow doesn't expose Prometheus metrics by default)
-  # - job_name: 'mlflow'
-  #   static_configs:
-  #     - targets: ['mlflow:5001']
-  #   metrics_path: /metrics
-  #   scrape_interval: 60s
-  #   relabel_configs:
-  #     - source_labels: [__address__]
-  #       target_label: service
-  #       replacement: 'mlflow-tracking'
-  #     - source_labels: [__address__]
-  #       target_label: component
-  #       replacement: 'ml-lifecycle'
+  # MLflow Tracking Server Metrics
+  - job_name: 'mlflow-metrics'
+    static_configs:
+      - targets: ['mlflow-metrics:8568']
+    metrics_path: /metrics
+    scrape_interval: 60s
+    honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'mlflow-tracking'
+      - source_labels: [__address__]
+        target_label: component
+        replacement: 'ml-lifecycle'
 
-  # Feast Feature Store
+  # Feast Feature Store - Main service metrics
   - job_name: 'feast-server'
     static_configs:
-      - targets: ['feast-server:6566']
+      - targets: ['feast-server:8567']  # Use metrics port instead of main port
     metrics_path: /metrics
     scrape_interval: 30s
     honor_labels: true
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        replacement: 'feast-server'
+      - source_labels: [__address__]
+        target_label: component
+        replacement: 'feature-store'
 
   # Training Job metrics (disabled - training jobs are batch jobs, not long-running services)
   # - job_name: 'training-jobs'
@@ -156,6 +170,8 @@ scrape_configs:
         - http://inference-api:8080/health
         - http://inference-api:8080/ready
         - http://inference-api:8080/metrics
+        - http://feast-server:8567/metrics
+        - http://mlflow-metrics:8568/metrics
         - http://mlflow:5001
     relabel_configs:
       - source_labels: [__address__]

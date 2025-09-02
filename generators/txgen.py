@@ -35,7 +35,7 @@ class TransactionGenerator(BaseEventGenerator, TimestampMixin):
     
     def __init__(self, **kwargs):
         # Extract fraud injection rate
-        self.fraud_rate = kwargs.pop('fraud_rate', 0.02)  # 2% fraud rate
+        self.fraud_rate = kwargs.pop('fraud_rate', 0.14)  # 14% fraud rate
         
         super().__init__(
             topic="txn.events",

@@ -38,6 +38,14 @@ from streaming.core.sinks.redis_sink import FeatureSink
 from streaming.core.processors.transaction import TransactionFeatureComputer
 from streaming.core.processors.clickstream import ClickstreamFeatureComputer
 from streaming.core.utils.metrics import EVENTS_PROCESSED, PROCESSING_DURATION
+from streaming.core.fraud_detector import SyncFraudDetectionService
+
+# Kafka consumer lag metric
+KAFKA_CONSUMER_LAG = Gauge(
+    'kafka_consumer_lag_sum',
+    'Kafka consumer lag in messages',
+    ['topic', 'partition', 'consumer_group']
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -71,6 +79,12 @@ class StreamProcessor:
         # Feature sink
         self.feature_sink = FeatureSink(config)
         
+        # Fraud detection service
+        self.fraud_detector = SyncFraudDetectionService(
+            inference_api_url=config.inference_api_url if hasattr(config, 'inference_api_url') 
+            else "http://inference-api:8080"
+        )
+        
         # Kafka consumer - no value deserializer, we'll handle Avro manually
         self.consumer = KafkaConsumer(
             *config.topics,
@@ -80,9 +94,51 @@ class StreamProcessor:
             auto_offset_reset='latest'
         )
         
+        # Track consumer lag
+        self._last_lag_check = 0
+        self._lag_check_interval = 30  # Check lag every 30 seconds
+        
         logger.info("Stream processor initialized",
                    topics=config.topics,
                    consumer_group=config.consumer_group)
+    
+    def _update_consumer_lag_metrics(self):
+        """Update Kafka consumer lag metrics."""
+        try:
+            current_time = time.time()
+            if current_time - self._last_lag_check < self._lag_check_interval:
+                return
+                
+            # Get consumer lag for each topic/partition
+            for topic in self.config.topics:
+                partitions = self.consumer.partitions_for_topic(topic)
+                if partitions:
+                    for partition in partitions:
+                        try:
+                            # Get high water mark (latest offset)
+                            high_water_mark = self.consumer.highwater(partition)
+                            
+                            # Get current consumer offset
+                            committed_offset = self.consumer.committed(partition)
+                            
+                            # Calculate lag
+                            lag = high_water_mark - (committed_offset or 0) if high_water_mark and committed_offset else 0
+                            
+                            # Update metric
+                            KAFKA_CONSUMER_LAG.labels(
+                                topic=topic,
+                                partition=str(partition),
+                                consumer_group=self.config.consumer_group
+                            ).set(lag)
+                            
+                        except Exception as e:
+                            logger.warning("Failed to get lag for partition", 
+                                         topic=topic, partition=partition, error=str(e))
+                            
+            self._last_lag_check = current_time
+            
+        except Exception as e:
+            logger.warning("Failed to update consumer lag metrics", error=str(e))
         
     def start(self):
         """Start the stream processor."""
@@ -98,6 +154,9 @@ class StreamProcessor:
             for message in self.consumer:
                 if not self.running:
                     break
+                
+                # Update consumer lag metrics periodically
+                self._update_consumer_lag_metrics()
                     
                 self.process_message(message)
                 
@@ -143,6 +202,33 @@ class StreamProcessor:
                 features = None
                 if topic == 'txn.events':
                     features = self.tx_computer.process_event(event)
+                    
+                    # Perform real-time fraud detection for transactions
+                    if features:
+                        try:
+                            fraud_result = self.fraud_detector.detect_fraud(event)
+                            if fraud_result:
+                                logger.info(
+                                    "Real-time fraud detection",
+                                    card_id=fraud_result.card_id,
+                                    fraud_score=fraud_result.fraud_score,
+                                    risk_level=fraud_result.risk_level,
+                                    action=fraud_result.recommended_action,
+                                    explanation=fraud_result.explanation
+                                )
+                                
+                                # Log critical fraud detections
+                                if fraud_result.risk_level == 'critical':
+                                    logger.warning(
+                                        "CRITICAL FRAUD DETECTED",
+                                        card_id=fraud_result.card_id,
+                                        fraud_score=fraud_result.fraud_score,
+                                        risk_factors=fraud_result.top_risk_factors,
+                                        action=fraud_result.recommended_action
+                                    )
+                        except Exception as e:
+                            logger.error("Fraud detection failed", error=str(e))
+                            
                 elif topic == 'click.events':
                     features = self.click_computer.process_event(event)
                 

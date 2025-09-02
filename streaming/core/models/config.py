@@ -46,6 +46,7 @@ class FeatureJobConfig(BaseModel):
     # Kafka configuration
     kafka_bootstrap_servers: str = Field(default="localhost:9092")
     schema_registry_url: str = Field(default="http://localhost:8081")
+    consumer_group: str = Field(default="flink-feature-job")
     
     # Source topics
     transaction_topic: str = Field(default="txn.events")
