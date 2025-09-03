@@ -136,6 +136,9 @@ services:
       - REDIS_PORT=6379
       - MODEL_VERSION=v1
       - LOG_LEVEL=DEBUG
+    volumes:
+      - ../training/outputs:/app/training/outputs
+      - ../training/models:/app/training/models
     depends_on:
       redis:
         condition: service_healthy
@@ -176,6 +179,56 @@ services:
     depends_on:
       redis:
         condition: service_healthy
+    profiles: ["training", "all"]
+
+  # === TRAINING SCHEDULER ===
+  training-scheduler:
+    build:
+      context: ..
+      dockerfile: training/Dockerfile
+    container_name: training-scheduler
+    environment:
+      - REDIS_HOST=redis
+      - MLFLOW_TRACKING_URI=http://mlflow:5001
+      - TRAINING_INTERVAL=600  # 10 minutes in seconds
+    volumes:
+      - ../training/outputs:/app/training/outputs
+      - ../training/models:/app/training/models
+    command: ["python", "-c", "
+import time
+import subprocess
+import logging
+import os
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+interval = int(os.getenv('TRAINING_INTERVAL', 600))
+logger.info(f'Starting training scheduler with {interval}s interval')
+
+while True:
+    try:
+        logger.info('Starting scheduled training job...')
+        result = subprocess.run(['python', 'training/train.py'], 
+                              capture_output=True, text=True, timeout=300)
+        if result.returncode == 0:
+            logger.info('Training completed successfully')
+        else:
+            logger.error(f'Training failed: {result.stderr}')
+    except subprocess.TimeoutExpired:
+        logger.error('Training job timed out')
+    except Exception as e:
+        logger.error(f'Training scheduler error: {e}')
+    
+    logger.info(f'Waiting {interval}s before next training...')
+    time.sleep(interval)
+"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      mlflow:
+        condition: service_healthy
+    restart: unless-stopped
     profiles: ["training", "all"]
 
 
