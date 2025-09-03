@@ -354,7 +354,6 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
         feature_start = time.perf_counter()
         features, feature_metadata = feature_client.get_card_features(request.card_id)
         FEATURE_FETCH_DURATION.observe(time.perf_counter() - feature_start)
-        print("features", features)
         if request.transaction_amount is not None:
             features["transaction_amount"] = request.transaction_amount
         if request.mcc_code:
@@ -372,7 +371,7 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
 
         # Check for ground truth to validate prediction accuracy
         actual_fraud = features.get('actual_fraud')
-        predicted_fraud = prediction_score > 0.5
+        predicted_fraud = prediction_score > config.model.prediction_threshold
         accuracy_info = {}
         
         if actual_fraud is not None:
@@ -395,6 +394,7 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
         )
 
         print("accuracy_info", accuracy_info)
+        print("prediction_score", prediction_score)
 
         return FraudScoreResponse(
             request_id=request_id,

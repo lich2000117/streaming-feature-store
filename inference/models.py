@@ -191,12 +191,17 @@ class SklearnModel(ModelInterface):
                 elif isinstance(value, (int, float)):
                     feature_vector.append(float(value))
                 elif isinstance(value, str):
-                    # Try to convert string to float
-                    try:
-                        feature_vector.append(float(value))
-                    except ValueError:
-                        # Use default for non-numeric strings
-                        feature_vector.append(0.0)
+                    # Handle string booleans
+                    if value.lower() in ('true', 'false'):
+                        converted = 1.0 if value.lower() == 'true' else 0.0
+                        feature_vector.append(converted)
+                    else:
+                        # Try to convert string to float
+                        try:
+                            feature_vector.append(float(value))
+                        except ValueError:
+                            # Use default for non-numeric strings
+                            feature_vector.append(0.0)
                 else:
                     feature_vector.append(0.0)
             else:

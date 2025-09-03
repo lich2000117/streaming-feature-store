@@ -14,7 +14,6 @@ build/
 .eggs/
 *.log
 
-training/outputs/
 
 # Virtual environments
 .venv/

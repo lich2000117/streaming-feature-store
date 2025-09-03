@@ -177,6 +177,8 @@ class FeatureStoreClient:
                 parsed_features = self._parse_redis_features(raw_features)
                 features.update(parsed_features)
                 
+
+                
                 # Extract feature timestamp if available
                 if 'feature_timestamp' in parsed_features:
                     feature_timestamp = parsed_features['feature_timestamp']
@@ -384,13 +386,14 @@ class FeatureStoreClient:
                 # Handle null values
                 if value == 'null' or value is None:
                     parsed[key] = None
+                # Parse booleans first (before numbers)
+                elif value.lower() in ('true', 'false'):
+                    parsed[key] = value.lower() == 'true'
                 # Try to parse as number
                 elif '.' in value or 'e' in value.lower():
                     parsed[key] = float(value)
                 elif value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
                     parsed[key] = int(value)
-                elif value.lower() in ('true', 'false'):
-                    parsed[key] = value.lower() == 'true'
                 else:
                     # Keep as string
                     parsed[key] = value

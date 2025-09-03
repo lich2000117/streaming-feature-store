@@ -160,53 +160,52 @@ class TransactionGenerator(BaseEventGenerator, TimestampMixin):
             category_info['std_amount']
         )
         
-        # Ensure positive amount
-        amount = max(1.0, base_amount)
+        # Ensure positive base amount
+        base_amount = max(1.0, base_amount)
         
-        # Make fraud transactions detectable but more realistic
+        # Make fraud transactions very obvious and detectable
         if is_fraud:
             fraud_type = random.random()
-            if fraud_type < 0.3:  # 30% are suspicious small amounts (card testing)
-                amount = random.uniform(1.0, 5.0)  # Small but not extreme
-            elif fraud_type < 0.5:  # 20% are moderately high (2-3x normal)
-                amount = base_amount * random.uniform(2.0, 3.5)  # 2-3.5x normal amount
-            elif fraud_type < 0.7:  # 20% are round numbers (suspicious patterns)
-                # Round numbers but within reasonable range
-                base_round = int(base_amount / 50) * 50  # Round to nearest 50
-                amount = max(50.0, base_round) + random.choice([0, 50, 100])
-            elif fraud_type < 0.85:  # 15% are high velocity (frequent amounts)
-                amount = random.uniform(base_amount * 0.8, base_amount * 1.2)  # Similar amounts
-            else:  # 15% are just above normal limits but reasonable
-                amount = base_amount * random.uniform(1.5, 2.2)  # 1.5-2.2x normal
-                
-        return amount
+            if fraud_type < 0.4:  # 40% are suspicious small amounts (card testing)
+                amount = random.uniform(0.50, 3.0)  # Very small amounts for card testing
+            elif fraud_type < 0.7:  # 30% are very high amounts
+                amount = base_amount * random.uniform(4.0, 8.0)  # 4-8x normal amount (very obvious)
+            elif fraud_type < 0.85:  # 15% are exact round numbers (very suspicious)
+                amount = random.choice([100.0, 250.0, 500.0, 1000.0, 2000.0, 5000.0])
+            else:  # 15% are just above normal limits 
+                amount = base_amount * random.uniform(2.5, 4.0)  # 2.5-4x normal
+        else:
+            # Normal transactions stay close to base amount
+            amount = base_amount * random.uniform(0.7, 1.3)  # ±30% variation
+        # Ensure positive amount
+        amount = max(1.0, amount)
+        return round(amount, 2)
         
     def _generate_geography(self, is_fraud: bool) -> Dict[str, Any]:
         """Generate geographic information for the transaction."""
         if is_fraud:
-            # Make fraud geography detectable but more realistic
+            # Make fraud geography very obvious
             fraud_geo_type = random.random()
-            if fraud_geo_type < 0.4:  # 40% from high-risk countries (but not all extreme)
-                high_risk = ['CN', 'RU', 'NG', 'BR']
-                medium_risk = ['MX', 'IN', 'ID', 'VN']  # Add medium risk countries
-                country = random.choice(high_risk + medium_risk)
+            if fraud_geo_type < 0.8:  # 80% from obvious high-risk countries
+                high_risk = ['CN', 'RU', 'NG', 'BR']  # Focus on highest risk
+                country = random.choice(high_risk)
                 
-                # Mix of suspicious and normal IPs
-                if random.random() < 0.3:  # 30% suspicious IPs
+                # Most fraud has suspicious IPs
+                if random.random() < 0.8:  # 80% suspicious IPs
                     ip_prefix = random.choice(self.ip_ranges['FRAUD'])
                     ip_address = f"{ip_prefix}{random.randint(1, 254)}"
-                else:  # 70% normal IPs from that region
-                    region = 'APAC' if country in ['CN', 'IN', 'ID', 'VN'] else 'EU'
+                else:  # 20% normal IPs but from high-risk region
+                    region = 'APAC' if country in ['CN'] else 'EU'
                     ip_prefix = random.choice(self.ip_ranges[region])
                     ip_address = f"{ip_prefix}{random.randint(1, 254)}.{random.randint(1, 254)}"
                     
-            elif fraud_geo_type < 0.7:  # 30% from normal countries but suspicious IPs
-                country = random.choice(['US', 'GB', 'CA', 'FR', 'DE'])  
+            elif fraud_geo_type < 0.95:  # 15% from normal countries but very suspicious IPs
+                country = random.choice(['US', 'GB', 'CA'])  
                 ip_prefix = random.choice(self.ip_ranges['FRAUD'])
                 ip_address = f"{ip_prefix}{random.randint(1, 254)}"
-            else:  # 30% look completely normal (sophisticated fraud)
-                country = random.choice(['US', 'GB', 'CA', 'FR', 'DE'])
-                region = 'US' if country in ['US', 'CA'] else 'EU'
+            else:  # 5% look normal (sophisticated fraud)
+                country = random.choice(['US', 'GB'])
+                region = 'US' if country == 'US' else 'EU'
                 ip_prefix = random.choice(self.ip_ranges[region])
                 ip_address = f"{ip_prefix}{random.randint(1, 254)}.{random.randint(1, 254)}"
         else:

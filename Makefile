@@ -141,13 +141,13 @@ demo:       ## 🎬 Complete demo setup
 	@echo "🚀 Starting feast server..."
 	@make feast_up
 	@sleep 5
-	@echo "🚀 Starting training job..."
-	@make train
-	@sleep 5
 	@echo "You can visit the dashboards with: make urls"
 	@make urls
 	@sleep 5
 	@echo "You can then test the API with: make test-api"
+## @sleep 20
+## @echo "🚀 Starting training job..."
+## @make train
 
 urls:       ## Show service URLs
 	@echo "🌐 Service URLs:"

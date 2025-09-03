@@ -48,30 +48,53 @@ class ModelConfig(BaseModel):
     # Inference settings
     use_onnx: bool = Field(default=False, description="Use ONNX runtime for inference")
     batch_size: int = Field(default=1, description="Batch size for inference")
-    prediction_threshold: float = Field(default=0.5, description="Binary classification threshold")
+    prediction_threshold: float = Field(default=0.3, description="Binary classification threshold")
     
     # Feature settings
     max_feature_age_minutes: int = Field(default=5, description="Max age of features in minutes")
     default_feature_values: Dict[str, Any] = Field(
         default_factory=lambda: {
+            # Count features
             "txn_count_5m": 0,
             "txn_count_30m": 0,
             "txn_count_24h": 0,
+            
+            # Amount features
             "amount_avg_5m": 0.0,
             "amount_sum_5m": 0.0,
             "amount_max_5m": 0.0,
             "amount_std_5m": 0.0,
+            
+            # Geographic features
             "unique_countries_5m": 1,
             "geo_diversity_score": 0.0,
+            
+            # Temporal features
             "time_since_last_txn_min": 0.0,
             "is_weekend": False,
             "hour_of_day": 12,
+            
+            # Risk features
             "velocity_score": 0.0,
             "high_risk_txn_ratio": 0.0,
+            "medium_risk_txn_ratio": 0.0,
             "has_high_risk_mcc": False,
             "is_high_velocity": False,
             "is_geo_diverse": False,
-            "actual_fraud": None  # Ground truth fraud label
+            
+            # New fraud detection features
+            "small_amount_ratio": 0.0,
+            "round_amount_ratio": 0.0,
+            "amount_zscore": 0.0,
+            "is_high_risk_country": False,
+            "is_suspicious_ip": False,
+            "device_reuse_ratio": 0.0,
+            "is_amount_outlier": False,
+            "has_small_amounts": False,
+            "has_round_amounts": False,
+            
+            # Ground truth
+            "actual_fraud": None
         },
         description="Default values for missing features"
     )

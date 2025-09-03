@@ -75,8 +75,8 @@ graph LR
 # Start entire ML platform
 make demo
 
-# Wait for ~10 minutes, then train the model
-make train
+# Wait for ~10 minutes, then train the model, then serve the API again
+sleep 60 && make train && sleep 10 && make serve
 
 # (Optional) Enable automated model training (every 10 minutes)
 make train-scheduled
