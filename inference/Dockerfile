@@ -19,6 +19,9 @@ COPY inference/ .
 # Create directories for models and outputs
 RUN mkdir -p training/outputs models logs
 
+# Copy trained model artifacts from training stage
+COPY training/outputs/ ./training/outputs/
+
 # Create non-root user for security
 RUN useradd --create-home --shell /bin/bash app \
     && chown -R app:app /app

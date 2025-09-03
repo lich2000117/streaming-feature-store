@@ -70,7 +70,7 @@ services:
     ports: [ "8568:8568" ]
     environment:
       - MLFLOW_TRACKING_URI=http://mlflow:5001
-    command: ["python", "mlflow_metrics.py", "--port", "8568", "--tracking-uri", "http://mlflow:5001"]
+    command: ["mlflow_metrics.py", "--port", "8568", "--tracking-uri", "http://mlflow:5001"]
     depends_on:
       mlflow:
         condition: service_healthy
@@ -136,9 +136,6 @@ services:
       - REDIS_PORT=6379
       - MODEL_VERSION=v1
       - LOG_LEVEL=DEBUG
-    volumes:
-      - ../training/outputs:/app/training/outputs
-      - ../training/models:/app/training/models
     depends_on:
       redis:
         condition: service_healthy

@@ -101,7 +101,7 @@ scrape_configs:
         - 'txn-generator:8001'
         - 'click-generator:8002'
     metrics_path: /metrics
-    scrape_interval: 30s
+    scrape_interval: 5s  # More frequent for speed monitoring
     relabel_configs:
       - source_labels: [__address__]
         regex: '([^:]+):.*'
