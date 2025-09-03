@@ -153,9 +153,21 @@ FRAUD_FEATURES = [
     # Risk features
     "velocity_score",
     "high_risk_txn_ratio",
+    "medium_risk_txn_ratio",  # New: medium risk MCC ratio
     "is_high_velocity",
     "is_geo_diverse",
-    "has_high_risk_mcc"
+    "has_high_risk_mcc",
+    
+    # New fraud detection features
+    "small_amount_ratio",      # Detect card testing patterns
+    "round_amount_ratio",      # Detect suspicious round amounts
+    "amount_zscore",           # Amount deviation from normal
+    "is_high_risk_country",    # Geographic risk indicator
+    "is_suspicious_ip",        # Suspicious IP patterns
+    "device_reuse_ratio",      # Device reuse patterns
+    "is_amount_outlier",       # Amount outlier flag
+    "has_small_amounts",       # Small amount testing flag
+    "has_round_amounts"        # Round amount pattern flag
 ]
 
 PERSONALIZATION_FEATURES = [

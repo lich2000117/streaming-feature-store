@@ -84,7 +84,7 @@ services:
       dockerfile: generators/Dockerfile
     container_name: txn-generator
     ports: [ "8001:8001" ]  # Expose metrics port
-    command: ["generators/txgen.py","--events-per-second","10","--duration","3600","--bootstrap-servers","kafka:9092","--metrics-port","8001", "--fraud-rate","0.4"]
+    command: ["generators/txgen.py","--events-per-second","20","--duration","7200","--bootstrap-servers","kafka:9092","--metrics-port","8001", "--fraud-rate","0.4"]
     depends_on:
       kafka:
         condition: service_healthy
@@ -97,7 +97,7 @@ services:
       dockerfile: generators/Dockerfile
     container_name: click-generator
     ports: [ "8002:8002" ]  # Expose metrics port
-    command: ["generators/clickgen.py","--events-per-second","4","--duration","3600","--bootstrap-servers","kafka:9092","--metrics-port","8002"]
+    command: ["generators/clickgen.py","--events-per-second","8","--duration","7200","--bootstrap-servers","kafka:9092","--metrics-port","8002"]
     depends_on:
       kafka:
         condition: service_healthy

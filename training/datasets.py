@@ -168,17 +168,49 @@ class FeatureStoreDataset:
             if col in df.columns:
                 df[col] = df[col].fillna(df[col].mode()[0] if len(df[col].mode()) > 0 else False)
         
-        # Remove outliers using IQR method for key numerical features
-        key_features = ['amount_avg_5m', 'amount_sum_5m', 'velocity_score']
-        for feature in key_features:
+        # Smart outlier removal that preserves fraud patterns
+        # Only remove extreme outliers that are clearly data quality issues
+        
+        # For amount features, use more lenient outlier detection to preserve fraud patterns
+        amount_features = ['amount_avg_5m', 'amount_sum_5m']
+        for feature in amount_features:
             if feature in df.columns:
+                # Use 3 IQR instead of 1.5 to be more lenient and preserve fraud patterns
                 Q1 = df[feature].quantile(0.25)
                 Q3 = df[feature].quantile(0.75)
                 IQR = Q3 - Q1
-                lower_bound = Q1 - 1.5 * IQR
-                upper_bound = Q3 + 1.5 * IQR
+                lower_bound = Q1 - 3.0 * IQR  # More lenient
+                upper_bound = Q3 + 3.0 * IQR  # More lenient
                 
+                # Only remove truly extreme outliers (likely data quality issues)
                 outlier_mask = (df[feature] < lower_bound) | (df[feature] > upper_bound)
+                extreme_outliers = outlier_mask.sum()
+                
+                if extreme_outliers > 0:
+                    logger.info(f"Removing {extreme_outliers} extreme outliers for {feature}")
+                    df = df[~outlier_mask]
+        
+        # For velocity score, use standard IQR but check fraud distribution
+        if 'velocity_score' in df.columns:
+            Q1 = df['velocity_score'].quantile(0.25)
+            Q3 = df['velocity_score'].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            outlier_mask = (df['velocity_score'] < lower_bound) | (df['velocity_score'] > upper_bound)
+            
+            # Check if we're removing too many fraud cases
+            if 'actual_fraud' in df.columns:
+                fraud_in_outliers = df[outlier_mask]['actual_fraud'].sum()
+                total_fraud = df['actual_fraud'].sum()
+                
+                if fraud_in_outliers / max(total_fraud, 1) > 0.5:  # If removing >50% of fraud
+                    logger.warning(f"Velocity outlier removal would remove {fraud_in_outliers}/{total_fraud} fraud cases - skipping")
+                else:
+                    logger.info(f"Removing velocity outliers: {outlier_mask.sum()} records")
+                    df = df[~outlier_mask]
+            else:
                 df = df[~outlier_mask]
         
         logger.info(f"Data quality validation: {initial_rows} -> {len(df)} rows ({len(df)/initial_rows:.1%} retained)")

@@ -71,10 +71,15 @@ class TransactionFeatureComputer:
                 time_since_last = None
                 avg_time_between = None
                 
-            # Risk indicators (aligned with generator fraud_likelihood >= 0.2)
-            high_risk_mccs = ['6011', '5967', '7011', '5311']  # atm, online, hotel, retail
+            # Risk indicators (aligned with generator fraud patterns)
+            high_risk_mccs = ['6011', '5967', '7011', '7995']  # atm, online, hotel, crypto/gambling
+            medium_risk_mccs = ['5311', '4511']  # retail, airline
+            
             high_risk_txns = sum(1 for e in window_events if e[1].get('mcc') in high_risk_mccs)
+            medium_risk_txns = sum(1 for e in window_events if e[1].get('mcc') in medium_risk_mccs)
+            
             risk_ratio = high_risk_txns / len(window_events)
+            medium_risk_ratio = medium_risk_txns / len(window_events)
             has_high_risk_mcc = risk_ratio > 0
             
             # Velocity features
@@ -102,6 +107,36 @@ class TransactionFeatureComputer:
             window_24h = [e for e in window_events if (timestamp - e[0]) <= (24 * 60 * 60 * 1000)]
             txn_count_30m = len(window_30m)
             txn_count_24h = len(window_24h)
+            
+            # Amount-based fraud detection features
+            current_amount = event['amount']
+            
+            # Small amount testing pattern (fraud feature)
+            small_amounts = sum(1 for e in window_events if e[1]['amount'] < 5.0)
+            small_amount_ratio = small_amounts / len(window_events)
+            
+            # Round number pattern detection
+            round_amounts = sum(1 for e in window_events if e[1]['amount'] % 50 == 0 and e[1]['amount'] >= 50)
+            round_amount_ratio = round_amounts / len(window_events)
+            
+            # Amount deviation from category normal (current txn compared to window)
+            amount_zscore = 0.0
+            if std_dev > 0:
+                amount_zscore = abs(current_amount - amount_avg) / std_dev
+            
+            # Geographic risk assessment
+            high_risk_countries = ['CN', 'RU', 'NG', 'BR', 'MX', 'IN', 'ID', 'VN']
+            current_country = event.get('geo_country', '')
+            is_high_risk_country = current_country in high_risk_countries
+            
+            # Suspicious IP patterns
+            current_ip = event.get('ip_address', '')
+            is_suspicious_ip = any(prefix in current_ip for prefix in ['tor_exit_', 'proxy_', 'vpn_'])
+            
+            # Device/Browser reuse patterns (fraud often reuses devices)
+            device_fp = event.get('device_id', '')
+            device_reuse_count = sum(1 for e in window_events if e[1].get('device_id') == device_fp)
+            device_reuse_ratio = device_reuse_count / len(window_events) if len(window_events) > 1 else 0
             
             # Create feature record
             features = {
@@ -134,9 +169,21 @@ class TransactionFeatureComputer:
                 
                 # Risk features
                 'high_risk_txn_ratio': round(risk_ratio, 3),
+                'medium_risk_txn_ratio': round(medium_risk_ratio, 3),
                 'has_high_risk_mcc': has_high_risk_mcc,
                 'is_high_velocity': velocity_score > 0.7,
                 'is_geo_diverse': unique_countries > 2,
+                
+                # New fraud detection features
+                'small_amount_ratio': round(small_amount_ratio, 3),
+                'round_amount_ratio': round(round_amount_ratio, 3),
+                'amount_zscore': round(amount_zscore, 3),
+                'is_high_risk_country': is_high_risk_country,
+                'is_suspicious_ip': is_suspicious_ip,
+                'device_reuse_ratio': round(device_reuse_ratio, 3),
+                'is_amount_outlier': amount_zscore > 2.0,
+                'has_small_amounts': small_amount_ratio > 0.2,
+                'has_round_amounts': round_amount_ratio > 0.3,
                 
                 # Ground truth (if available from current event)
                 'actual_fraud': event.get('is_fraud'),  # Store ground truth for validation

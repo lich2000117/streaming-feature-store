@@ -26,7 +26,7 @@ feast_up:      ## Start feature store server, and apply feature definitions
 	docker exec -it feast-server feast apply
 
 train:      ## Run ML training pipeline (with MLflow), scheduled retrain at the same time
-	docker compose -f infra/docker-compose.yml up training-job --build
+	docker compose -f infra/docker-compose.yml up training-job -d --build
 
 train-scheduled:      ## Run ML training pipeline (with MLflow), scheduled retrain at the same time
 	docker compose -f infra/docker-compose.yml up training-scheduler -d --build

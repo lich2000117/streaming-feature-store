@@ -62,10 +62,22 @@ transaction_stats_5m = FeatureView(
         # Risk features
         Field(name="velocity_score", dtype=Float32, description="Transaction velocity score (0-1)"),
         Field(name="high_risk_txn_ratio", dtype=Float32, description="Ratio of high-risk transactions"),
+        Field(name="medium_risk_txn_ratio", dtype=Float32, description="Ratio of medium-risk transactions"),
         Field(name="is_high_velocity", dtype=Bool, description="Whether card shows high velocity"),
         Field(name="is_geo_diverse", dtype=Bool, description="Whether card shows geographic diversity"),
         Field(name="has_high_risk_mcc", dtype=Bool, description="Whether transaction has high-risk MCC"),
         Field(name="device_location_mismatch", dtype=Bool, description="Device and transaction location mismatch"),
+        
+        # New fraud detection features
+        Field(name="small_amount_ratio", dtype=Float32, description="Ratio of small amount transactions (card testing)"),
+        Field(name="round_amount_ratio", dtype=Float32, description="Ratio of round number transactions"),
+        Field(name="amount_zscore", dtype=Float32, description="Z-score of current amount vs historical"),
+        Field(name="is_high_risk_country", dtype=Bool, description="Whether transaction from high-risk country"),
+        Field(name="is_suspicious_ip", dtype=Bool, description="Whether IP address is suspicious"),
+        Field(name="device_reuse_ratio", dtype=Float32, description="Device reuse ratio in window"),
+        Field(name="is_amount_outlier", dtype=Bool, description="Whether amount is statistical outlier"),
+        Field(name="has_small_amounts", dtype=Bool, description="Whether window contains small amounts"),
+        Field(name="has_round_amounts", dtype=Bool, description="Whether window contains round amounts"),
         
         # Metadata
         Field(name="window_size_minutes", dtype=Int32, description="Feature computation window size"),

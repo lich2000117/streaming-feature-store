@@ -75,10 +75,14 @@ class TransactionGenerator(BaseEventGenerator, TimestampMixin):
             'CA': {'fraud_multiplier': 0.6, 'cities': ['Toronto', 'Vancouver', 'Montreal', 'Calgary']},
             'FR': {'fraud_multiplier': 0.7, 'cities': ['Paris', 'Lyon', 'Marseille', 'Toulouse']},
             'DE': {'fraud_multiplier': 0.5, 'cities': ['Berlin', 'Hamburg', 'Munich', 'Cologne']},
-            'CN': {'fraud_multiplier': 5.0, 'cities': ['Beijing', 'Shanghai', 'Guangzhou', 'Shenzhen']},  # Much higher fraud rate
-            'RU': {'fraud_multiplier': 8.0, 'cities': ['Moscow', 'St Petersburg', 'Novosibirsk', 'Yekaterinburg']},  # Much higher fraud rate
-            'NG': {'fraud_multiplier': 10.0, 'cities': ['Lagos', 'Abuja', 'Kano', 'Ibadan']},  # Very high fraud rate
-            'BR': {'fraud_multiplier': 6.0, 'cities': ['São Paulo', 'Rio de Janeiro', 'Brasília', 'Salvador']}  # High fraud rate
+            'CN': {'fraud_multiplier': 3.0, 'cities': ['Beijing', 'Shanghai', 'Guangzhou', 'Shenzhen']},
+            'RU': {'fraud_multiplier': 4.0, 'cities': ['Moscow', 'St Petersburg', 'Novosibirsk', 'Yekaterinburg']},
+            'NG': {'fraud_multiplier': 5.0, 'cities': ['Lagos', 'Abuja', 'Kano', 'Ibadan']},
+            'BR': {'fraud_multiplier': 3.5, 'cities': ['São Paulo', 'Rio de Janeiro', 'Brasília', 'Salvador']},
+            'MX': {'fraud_multiplier': 2.5, 'cities': ['Mexico City', 'Guadalajara', 'Monterrey', 'Puebla']},
+            'IN': {'fraud_multiplier': 2.8, 'cities': ['Mumbai', 'Delhi', 'Bangalore', 'Chennai']},
+            'ID': {'fraud_multiplier': 2.2, 'cities': ['Jakarta', 'Surabaya', 'Medan', 'Bandung']},
+            'VN': {'fraud_multiplier': 2.0, 'cities': ['Ho Chi Minh City', 'Hanoi', 'Da Nang', 'Can Tho']}
         }
         
         # Card ID pool for consistency
@@ -108,14 +112,21 @@ class TransactionGenerator(BaseEventGenerator, TimestampMixin):
         # Generate transaction amount
         amount = self._generate_amount(category_info, is_fraud)
         
-        # Select card ID (fraudulent transactions use compromised cards more often)
+        # Select card ID (fraudulent transactions have different patterns)
         if is_fraud:
-            if random.random() < 0.7:  # 70% of fraud uses "hot" cards
-                card_id = random.choice(self.card_ids[:50])  # Top 50 cards are "hot"
-            else:  # 30% use brand new cards (card testing)
-                card_id = f"card_{random.randint(50000, 99999):08d}"  # New card range
+            fraud_card_type = random.random()
+            if fraud_card_type < 0.4:  # 40% use compromised cards (high frequency)
+                card_id = random.choice(self.card_ids[:200])  # Top 200 cards are more active
+            elif fraud_card_type < 0.7:  # 30% use newly issued cards (card testing)
+                card_id = f"card_{random.randint(45000, 49999):08d}"  # Recent card range
+            else:  # 30% use random existing cards (stolen card info)
+                card_id = random.choice(self.card_ids)
         else:
-            card_id = random.choice(self.card_ids[100:])  # Normal cards avoid hot range
+            # Normal transactions use the full range but bias toward established cards
+            if random.random() < 0.8:  # 80% use established cards
+                card_id = random.choice(self.card_ids[200:])  # Avoid the most active range
+            else:  # 20% use any card (normal variation)
+                card_id = random.choice(self.card_ids)
             
         # Generate geography
         geo_info = self._generate_geography(is_fraud)
@@ -152,41 +163,50 @@ class TransactionGenerator(BaseEventGenerator, TimestampMixin):
         # Ensure positive amount
         amount = max(1.0, base_amount)
         
-        # Make fraud transactions much more obvious
+        # Make fraud transactions detectable but more realistic
         if is_fraud:
             fraud_type = random.random()
-            if fraud_type < 0.4:  # 40% are very small test transactions
-                amount = random.uniform(0.01, 1.0)  # Very small amounts
-            elif fraud_type < 0.7:  # 30% are extremely large transactions
-                amount = random.uniform(5000.0, 50000.0)  # Very large amounts
-            elif fraud_type < 0.85:  # 15% are round numbers (suspicious)
-                amount = random.choice([100.0, 500.0, 1000.0, 2000.0, 5000.0, 10000.0])
-            else:  # 15% are just above typical limits
-                amount = random.uniform(2000.0, 5000.0)
+            if fraud_type < 0.3:  # 30% are suspicious small amounts (card testing)
+                amount = random.uniform(1.0, 5.0)  # Small but not extreme
+            elif fraud_type < 0.5:  # 20% are moderately high (2-3x normal)
+                amount = base_amount * random.uniform(2.0, 3.5)  # 2-3.5x normal amount
+            elif fraud_type < 0.7:  # 20% are round numbers (suspicious patterns)
+                # Round numbers but within reasonable range
+                base_round = int(base_amount / 50) * 50  # Round to nearest 50
+                amount = max(50.0, base_round) + random.choice([0, 50, 100])
+            elif fraud_type < 0.85:  # 15% are high velocity (frequent amounts)
+                amount = random.uniform(base_amount * 0.8, base_amount * 1.2)  # Similar amounts
+            else:  # 15% are just above normal limits but reasonable
+                amount = base_amount * random.uniform(1.5, 2.2)  # 1.5-2.2x normal
                 
         return amount
         
     def _generate_geography(self, is_fraud: bool) -> Dict[str, Any]:
         """Generate geographic information for the transaction."""
         if is_fraud:
-            # Make fraud geography much more obvious
+            # Make fraud geography detectable but more realistic
             fraud_geo_type = random.random()
-            if fraud_geo_type < 0.6:  # 60% from high-risk countries
-                country = random.choice(['CN', 'RU', 'NG', 'BR'])  # High fraud countries
+            if fraud_geo_type < 0.4:  # 40% from high-risk countries (but not all extreme)
+                high_risk = ['CN', 'RU', 'NG', 'BR']
+                medium_risk = ['MX', 'IN', 'ID', 'VN']  # Add medium risk countries
+                country = random.choice(high_risk + medium_risk)
+                
+                # Mix of suspicious and normal IPs
+                if random.random() < 0.3:  # 30% suspicious IPs
+                    ip_prefix = random.choice(self.ip_ranges['FRAUD'])
+                    ip_address = f"{ip_prefix}{random.randint(1, 254)}"
+                else:  # 70% normal IPs from that region
+                    region = 'APAC' if country in ['CN', 'IN', 'ID', 'VN'] else 'EU'
+                    ip_prefix = random.choice(self.ip_ranges[region])
+                    ip_address = f"{ip_prefix}{random.randint(1, 254)}.{random.randint(1, 254)}"
+                    
+            elif fraud_geo_type < 0.7:  # 30% from normal countries but suspicious IPs
+                country = random.choice(['US', 'GB', 'CA', 'FR', 'DE'])  
                 ip_prefix = random.choice(self.ip_ranges['FRAUD'])
                 ip_address = f"{ip_prefix}{random.randint(1, 254)}"
-            elif fraud_geo_type < 0.8:  # 20% from suspicious IPs
-                country = random.choice(['US', 'GB'])  # Normal country but suspicious IP
-                ip_prefix = random.choice(self.ip_ranges['FRAUD'])
-                ip_address = f"{ip_prefix}{random.randint(1, 254)}"
-            else:  # 20% from very distant locations
-                country = random.choice(['CN', 'RU', 'NG'])
-                if country in ['US', 'CA']:
-                    region = 'US'
-                elif country in ['GB', 'FR', 'DE']:
-                    region = 'EU'
-                else:
-                    region = 'APAC'
+            else:  # 30% look completely normal (sophisticated fraud)
+                country = random.choice(['US', 'GB', 'CA', 'FR', 'DE'])
+                region = 'US' if country in ['US', 'CA'] else 'EU'
                 ip_prefix = random.choice(self.ip_ranges[region])
                 ip_address = f"{ip_prefix}{random.randint(1, 254)}.{random.randint(1, 254)}"
         else:
@@ -254,31 +274,54 @@ class TransactionGenerator(BaseEventGenerator, TimestampMixin):
     def _generate_metadata(self, is_fraud: bool, category: str) -> Dict[str, str]:
         """Generate additional metadata for the transaction."""
         if is_fraud:
-            # Make fraud metadata very obvious
+            # Make fraud metadata detectable but more realistic
+            fraud_meta_type = random.random()
+            
+            # Channel selection (fraud has different patterns)
+            if fraud_meta_type < 0.5:  # 50% online/digital channels
+                channel = random.choice(['online', 'mobile', 'atm'])
+            else:  # 50% look normal
+                channel = random.choice(['online', 'pos', 'mobile', 'atm'])
+            
+            # Device fingerprints (some reused devices)
+            if random.random() < 0.3:  # 30% reused suspicious devices
+                device_id = f"device_{random.randint(1000, 1050)}"  # Small pool of devices
+                browser_id = f"browser_{random.randint(100, 150)}"  # Small pool of browsers
+            else:  # 70% look normal
+                device_id = f"device_{random.randint(10000, 99999)}"
+                browser_id = f"browser_{random.randint(1000, 9999)}"
+            
+            # Merchant names (mix of suspicious and normal)
+            if category in ['online', 'crypto', 'gambling']:
+                merchant_names = [
+                    'CRYPTO_EXCHANGE_LLC', 'ONLINE_BETTING_CO', 'DIGITAL_MARKETPLACE',
+                    'VIRTUAL_SERVICES', 'TECH_SOLUTIONS_INC'
+                ]
+            else:
+                # Use normal merchant names but with slight variations
+                merchant_names = [
+                    'WALMART_ONLINE', 'AMAZON_MARKETPLACE', 'SHELL_DIGITAL',
+                    'MCDONALDS_APP', 'TARGET_MOBILE', 'STARBUCKS_ONLINE'
+                ]
+            
             metadata = {
-                'channel': random.choice(['online', 'atm']),  # Higher risk channels
+                'channel': channel,
                 'merchant_category': category,
-                'risk_flags': random.choice([
-                    'velocity_high', 'geo_mismatch', 'device_new', 'amount_unusual',
-                    'suspicious_ip', 'high_risk_country', 'round_amount', 'test_transaction'
-                ]),
-                'device_fingerprint': f"suspicious_device_{random.randint(1000, 9999)}",
-                'browser_fingerprint': f"fraud_browser_{random.randint(100, 999)}",
-                'merchant_name': random.choice([
-                    'SUSPICIOUS_MERCHANT', 'FRAUD_TEST_SITE', 'HIGH_RISK_VENDOR',
-                    'CRYPTO_EXCHANGE', 'GAMBLING_SITE', 'UNKNOWN_MERCHANT'
-                ])
+                'device_fingerprint': device_id,
+                'browser_fingerprint': browser_id,
+                'merchant_name': random.choice(merchant_names)
             }
         else:
-            # Normal metadata
+            # Normal metadata with realistic patterns
             metadata = {
-                'channel': random.choice(['online', 'pos', 'atm', 'mobile']),
+                'channel': random.choice(['pos', 'online', 'mobile', 'atm']),  # POS more common for normal
                 'merchant_category': category,
-                'device_fingerprint': f"normal_device_{random.randint(10000, 99999)}",
-                'browser_fingerprint': f"normal_browser_{random.randint(1000, 9999)}",
+                'device_fingerprint': f"device_{random.randint(10000, 99999)}",
+                'browser_fingerprint': f"browser_{random.randint(1000, 9999)}",
                 'merchant_name': random.choice([
                     'WALMART', 'TARGET', 'AMAZON', 'STARBUCKS', 'MCDONALDS',
-                    'SHELL', 'EXXON', 'HILTON', 'MARRIOTT', 'UNITED_AIRLINES'
+                    'SHELL', 'EXXON', 'HILTON', 'MARRIOTT', 'UNITED_AIRLINES',
+                    'HOME_DEPOT', 'COSTCO', 'WHOLE_FOODS', 'CVS_PHARMACY'
                 ])
             }
             
