@@ -7,11 +7,15 @@
 [![Docker](https://img.shields.io/badge/docker-ready-blue.svg)](https://github.com/chenghao/streaming-feature-store)
 
 **Production-grade streaming ML platform for real-time fraud detection and personalization**  
+
 *Demonstrating Data Engineering, MLOps, and Infrastructure Engineering capabilities*
+
+![Real-Time Fraud Detection](docs/images/RealtimeFraudDetection.png)
 
 ![Feature Store Architecture](docs/images/FeatureStoreIMG.png)
 
 ![Streaming Performance](docs/images/StreamSpeedAndMLFlow.png)
+
 
 ## 🎯 Key Capabilities
 

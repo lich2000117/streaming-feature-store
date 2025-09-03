@@ -51,6 +51,23 @@ HIGH_RISK_TRANSACTIONS = Counter(
     'Total high-risk transactions requiring review'
 )
 
+MEDIUM_RISK_TRANSACTIONS = Counter(
+    'medium_risk_transactions_total', 
+    'Total medium-risk transactions flagged for monitoring'
+)
+
+# Accuracy metrics (when ground truth is available)
+FRAUD_ACCURACY_TOTAL = Counter(
+    'fraud_accuracy_total',
+    'Total fraud predictions with ground truth',
+    ['prediction_type']  # 'true_positive', 'true_negative', 'false_positive', 'false_negative'
+)
+
+FRAUD_ACCURACY_GAUGE = Gauge(
+    'fraud_accuracy_current',
+    'Current fraud detection accuracy (last 100 predictions with ground truth)'
+)
+
 
 @dataclass
 class FraudResult:
@@ -74,6 +91,7 @@ class FraudDetectionService:
         self.inference_api_url = inference_api_url
         self.session: Optional[aiohttp.ClientSession] = None
         self.recent_results: List[bool] = []  # Track recent fraud detections for rate calculation
+        self.recent_accuracy: List[bool] = []  # Track recent accuracy when ground truth available
         self.max_recent_results = 100
         
     async def __aenter__(self):
@@ -160,6 +178,31 @@ class FraudDetectionService:
                         BLOCKED_TRANSACTIONS.inc()
                     elif fraud_result.risk_level in ['high', 'critical']:
                         HIGH_RISK_TRANSACTIONS.inc()
+                    elif fraud_result.risk_level == 'medium':
+                        MEDIUM_RISK_TRANSACTIONS.inc()
+                    
+                    # Track accuracy if ground truth is available
+                    actual_fraud = result_data.get("actual_fraud")
+                    if actual_fraud is not None:
+                        predicted_fraud = fraud_result.fraud_score > 0.3  # Using threshold
+                        actual_fraud_bool = bool(actual_fraud)
+                        
+                        # Calculate confusion matrix components
+                        if actual_fraud_bool and predicted_fraud:
+                            prediction_type = "true_positive"
+                            is_correct = True
+                        elif not actual_fraud_bool and not predicted_fraud:
+                            prediction_type = "true_negative"
+                            is_correct = True
+                        elif not actual_fraud_bool and predicted_fraud:
+                            prediction_type = "false_positive"
+                            is_correct = False
+                        else:  # actual_fraud_bool and not predicted_fraud
+                            prediction_type = "false_negative"
+                            is_correct = False
+                        
+                        FRAUD_ACCURACY_TOTAL.labels(prediction_type=prediction_type).inc()
+                        self._update_accuracy(is_correct)
                     
                     logger.info(
                         "Fraud detection completed",
@@ -169,7 +212,9 @@ class FraudDetectionService:
                         action=fraud_result.recommended_action,
                         latency_ms=detection_latency * 1000,
                         api_latency_ms=fraud_result.latency_ms,
-                        features_used=fraud_result.features_used
+                        features_used=fraud_result.features_used,
+                        actual_fraud=actual_fraud,
+                        prediction_correct=actual_fraud is not None and is_correct if 'is_correct' in locals() else None
                     )
                     
                     return fraud_result
@@ -206,6 +251,19 @@ class FraudDetectionService:
             fraud_rate = sum(self.recent_results) / len(self.recent_results)
             FRAUD_RATE_GAUGE.set(fraud_rate)
     
+    def _update_accuracy(self, is_correct: bool):
+        """Update the rolling accuracy calculation."""
+        self.recent_accuracy.append(is_correct)
+        
+        # Keep only recent results
+        if len(self.recent_accuracy) > self.max_recent_results:
+            self.recent_accuracy = self.recent_accuracy[-self.max_recent_results:]
+        
+        # Calculate current accuracy
+        if self.recent_accuracy:
+            accuracy = sum(self.recent_accuracy) / len(self.recent_accuracy)
+            FRAUD_ACCURACY_GAUGE.set(accuracy)
+    
     async def health_check(self) -> bool:
         """Check if the fraud detection API is healthy."""
         if not self.session:
@@ -224,6 +282,7 @@ class SyncFraudDetectionService:
     def __init__(self, inference_api_url: str = "http://inference-api:8080"):
         self.inference_api_url = inference_api_url
         self.recent_results: List[bool] = []
+        self.recent_accuracy: List[bool] = []
         self.max_recent_results = 100
         
     def detect_fraud(self, transaction: Dict[str, Any]) -> Optional[FraudResult]:
@@ -297,6 +356,31 @@ class SyncFraudDetectionService:
                     BLOCKED_TRANSACTIONS.inc()
                 elif fraud_result.risk_level in ['high', 'critical']:
                     HIGH_RISK_TRANSACTIONS.inc()
+                elif fraud_result.risk_level == 'medium':
+                    MEDIUM_RISK_TRANSACTIONS.inc()
+                
+                # Track accuracy if ground truth is available
+                actual_fraud = result_data.get("actual_fraud")
+                if actual_fraud is not None:
+                    predicted_fraud = fraud_result.fraud_score > 0.3  # Using threshold
+                    actual_fraud_bool = bool(actual_fraud)
+                    
+                    # Calculate confusion matrix components
+                    if actual_fraud_bool and predicted_fraud:
+                        prediction_type = "true_positive"
+                        is_correct = True
+                    elif not actual_fraud_bool and not predicted_fraud:
+                        prediction_type = "true_negative"
+                        is_correct = True
+                    elif not actual_fraud_bool and predicted_fraud:
+                        prediction_type = "false_positive"
+                        is_correct = False
+                    else:  # actual_fraud_bool and not predicted_fraud
+                        prediction_type = "false_negative"
+                        is_correct = False
+                    
+                    FRAUD_ACCURACY_TOTAL.labels(prediction_type=prediction_type).inc()
+                    self._update_accuracy(is_correct)
                 
                 logger.info(
                     "Fraud detection completed",
@@ -306,7 +390,9 @@ class SyncFraudDetectionService:
                     action=fraud_result.recommended_action,
                     latency_ms=detection_latency * 1000,
                     api_latency_ms=fraud_result.latency_ms,
-                    features_used=fraud_result.features_used
+                    features_used=fraud_result.features_used,
+                    actual_fraud=actual_fraud,
+                    prediction_correct=actual_fraud is not None and is_correct if 'is_correct' in locals() else None
                 )
                 
                 return fraud_result
@@ -342,6 +428,19 @@ class SyncFraudDetectionService:
         if self.recent_results:
             fraud_rate = sum(self.recent_results) / len(self.recent_results)
             FRAUD_RATE_GAUGE.set(fraud_rate)
+    
+    def _update_accuracy(self, is_correct: bool):
+        """Update the rolling accuracy calculation."""
+        self.recent_accuracy.append(is_correct)
+        
+        # Keep only recent results
+        if len(self.recent_accuracy) > self.max_recent_results:
+            self.recent_accuracy = self.recent_accuracy[-self.max_recent_results:]
+        
+        # Calculate current accuracy
+        if self.recent_accuracy:
+            accuracy = sum(self.recent_accuracy) / len(self.recent_accuracy)
+            FRAUD_ACCURACY_GAUGE.set(accuracy)
     
     def health_check(self) -> bool:
         """Check if the fraud detection API is healthy."""

@@ -393,8 +393,7 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
             **accuracy_info
         )
 
-        print("accuracy_info", accuracy_info)
-        print("prediction_score", prediction_score)
+
 
         return FraudScoreResponse(
             request_id=request_id,
@@ -407,6 +406,7 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
             features_used=getattr(feature_metadata, "feature_count", len(features)),
             top_risk_factors=interpretation["top_risk_factors"],
             feature_importance=model_metadata.get("feature_importance"),
+            actual_fraud=actual_fraud,  # Add ground truth to response
             recommended_action=interpretation["recommended_action"],
             explanation=interpretation["explanation"],
             feature_freshness_sec=getattr(feature_metadata, "freshness_seconds", None),

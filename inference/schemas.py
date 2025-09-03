@@ -160,6 +160,12 @@ class FraudScoreResponse(BaseResponse):
         default=None,
         description="Age of features in seconds"
     )
+    
+    # Ground truth (for accuracy tracking)
+    actual_fraud: Optional[bool] = Field(
+        default=None,
+        description="Ground truth fraud label (when available)"
+    )
 
 
 # === Personalization Models ===
