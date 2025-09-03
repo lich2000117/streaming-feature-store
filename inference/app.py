@@ -374,6 +374,7 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
         actual_fraud = features.get('actual_fraud')
         predicted_fraud = prediction_score > 0.5
         accuracy_info = {}
+        
         if actual_fraud is not None:
             accuracy_info = {
                 "actual_fraud": actual_fraud,
@@ -392,6 +393,8 @@ async def score_fraud(request: FraudScoreRequest, request_id: str = Depends(get_
             cache_hit=getattr(feature_metadata, "cache_hit", False),
             **accuracy_info
         )
+
+        print("accuracy_info", accuracy_info)
 
         return FraudScoreResponse(
             request_id=request_id,

@@ -226,11 +226,6 @@ class FeatureStoreClient:
                 retrieval_time_ms=(time.time() - start_time) * 1000
             )
             
-            print(
-                "Retrieved card features: card_id=%s, feature_count=%d, missing_count=%d, freshness_sec=%d, retrieval_ms=%.2f",
-                card_id, len(mapped_features), len(missing_features), freshness_seconds, metadata.retrieval_time_ms
-            )
-            
             return mapped_features, metadata
             
         except (RedisError, ConnectionError, TimeoutError) as e:
@@ -386,8 +381,11 @@ class FeatureStoreClient:
                 continue
             
             try:
+                # Handle null values
+                if value == 'null' or value is None:
+                    parsed[key] = None
                 # Try to parse as number
-                if '.' in value or 'e' in value.lower():
+                elif '.' in value or 'e' in value.lower():
                     parsed[key] = float(value)
                 elif value.isdigit() or (value.startswith('-') and value[1:].isdigit()):
                     parsed[key] = int(value)

@@ -211,9 +211,16 @@ class StreamProcessor:
                 features = None
                 if topic == 'txn.events':
                     features = self.tx_computer.process_event(event)
-                    
-                    # Perform real-time fraud detection for transactions
-                    if features:
+                            
+                elif topic == 'click.events':
+                    features = self.click_computer.process_event(event)
+                
+                # Write features to sink
+                if features:
+                    success = self.feature_sink.write_features(features)
+                    status = 'success' if success else 'sink_error'
+                     # Perform real-time fraud detection for transactions
+                    if topic == 'txn.events' and success:
                         try:
                             fraud_result = self.fraud_detector.detect_fraud(event)
                             if fraud_result:
@@ -237,14 +244,6 @@ class StreamProcessor:
                                     )
                         except Exception as e:
                             logger.error("Fraud detection failed", error=str(e))
-                            
-                elif topic == 'click.events':
-                    features = self.click_computer.process_event(event)
-                
-                # Write features to sink
-                if features:
-                    success = self.feature_sink.write_features(features)
-                    status = 'success' if success else 'sink_error'
                 else:
                     status = 'processing_error'
                     

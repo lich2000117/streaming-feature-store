@@ -70,7 +70,8 @@ class ModelConfig(BaseModel):
             "high_risk_txn_ratio": 0.0,
             "has_high_risk_mcc": False,
             "is_high_velocity": False,
-            "is_geo_diverse": False
+            "is_geo_diverse": False,
+            "actual_fraud": None  # Ground truth fraud label
         },
         description="Default values for missing features"
     )

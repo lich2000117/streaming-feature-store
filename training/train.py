@@ -29,7 +29,7 @@ project_root = Path(__file__).parent.parent
 sys.path.insert(0, str(project_root))
 
 from config import TrainingConfig
-from datasets import FeatureStoreDataset, create_synthetic_features_for_testing
+from datasets import FeatureStoreDataset
 from models import ModelTrainer, MLflowExperimentManager
 
 # Configure logging
@@ -127,27 +127,14 @@ class TrainingPipeline:
             self.mlflow_manager.end_run()
     
     def _create_dataset(self) -> tuple[pd.DataFrame, pd.Series]:
-        """Create training dataset from feature store or synthetic data."""
-        try:
-            # Try to get data from Redis feature store
-            X, y = self.dataset_creator.create_fraud_dataset()
-            
-            if len(X) > 0:
-                logger.info(f"Successfully created dataset from feature store: {len(X)} samples")
-                return X, y
-            else:
-                logger.warning("No data in feature store, creating synthetic dataset for testing")
-                
-        except Exception as e:
-            logger.warning(f"Failed to connect to feature store: {e}")
-            logger.info("Creating synthetic dataset for testing")
+        """Create training dataset from feature store."""
+        logger.info("Creating dataset from feature store")
+        X, y = self.dataset_creator.create_fraud_dataset()
         
-        # Fallback to synthetic data
-        X, y = create_synthetic_features_for_testing(
-            n_samples=5000,
-            fraud_rate=self.config.data.fraud_rate_target
-        )
+        if len(X) == 0:
+            raise ValueError("No training data available in feature store. Ensure transaction generator is running and features are being stored.")
         
+        logger.info(f"Successfully created dataset from feature store: {len(X)} samples")
         return X, y
     
     def _log_dataset_stats(self, X_train, y_train, X_val, y_val, X_test, y_test):
@@ -201,11 +188,10 @@ class TrainingPipeline:
 @click.option('--config-file', default=None, help='Path to configuration file')
 @click.option('--model-type', default='xgboost', help='Model type: xgboost, lightgbm, random_forest, logistic_regression')
 @click.option('--experiment-name', default='fraud_detection', help='MLflow experiment name')
-@click.option('--fraud-rate', default=0.02, type=float, help='Target fraud rate for synthetic data')
 @click.option('--cv-folds', default=5, type=int, help='Number of cross-validation folds')
 @click.option('--test-size', default=0.2, type=float, help='Test set proportion')
 @click.option('--verbose', '-v', is_flag=True, help='Verbose logging')
-def main(config_file, model_type, experiment_name, fraud_rate, cv_folds, test_size, verbose):
+def main(config_file, model_type, experiment_name, cv_folds, test_size, verbose):
     """Run ML training pipeline."""
     
     if verbose:
@@ -224,7 +210,6 @@ def main(config_file, model_type, experiment_name, fraud_rate, cv_folds, test_si
         # Override config with CLI arguments
         config.model.model_type = model_type
         config.mlflow.experiment_name = experiment_name
-        config.data.fraud_rate_target = fraud_rate
         config.model.cv_folds = cv_folds
         config.model.test_size = test_size
         

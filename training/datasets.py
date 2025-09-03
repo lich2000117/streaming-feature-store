@@ -14,7 +14,7 @@ import time
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Tuple, Optional
-import random
+
 
 import pandas as pd
 import numpy as np
@@ -56,13 +56,18 @@ class FeatureStoreDataset:
         # Convert to DataFrame
         df = pd.DataFrame(card_features)
         
-        # Use ground truth fraud labels if available, otherwise generate them
-        if 'actual_fraud' in df.columns:
-            logger.info("Using ground truth fraud labels from transaction generator")
-            df['is_fraud'] = df['actual_fraud'].fillna(False)
-        else:
-            logger.info("Ground truth not available, abort")
-            raise ValueError("Ground truth not available, aborting dataset creation")
+        # Ensure ground truth fraud labels are available
+        if 'actual_fraud' not in df.columns:
+            raise ValueError("Ground truth fraud labels not found in feature store. Ensure transaction generator is running with fraud labels enabled.")
+        
+        logger.info("Using ground truth fraud labels from transaction generator")
+        df['is_fraud'] = df['actual_fraud'].fillna(False)
+        
+        # Log fraud label statistics
+        fraud_count = df['actual_fraud'].sum()
+        total_count = len(df)
+        fraud_rate = fraud_count / total_count if total_count > 0 else 0
+        logger.info(f"Ground truth fraud labels: {fraud_count}/{total_count} ({fraud_rate:.2%} fraud rate)")
         
         # Validate data quality
         df = self._validate_data_quality(df)
@@ -254,48 +259,4 @@ class FeatureStoreDataset:
         return pd.DataFrame(), pd.Series()
 
 
-def create_synthetic_features_for_testing(n_samples: int = 1000, fraud_rate: float = 0.02) -> Tuple[pd.DataFrame, pd.Series]:
-    """Create synthetic feature data for testing when Redis is not available."""
-    logger.info(f"Creating synthetic dataset with {n_samples} samples for testing")
-    
-    np.random.seed(42)
-    
-    # Generate synthetic features
-    data = {
-        'txn_count_5m': np.random.poisson(2, n_samples),
-        'txn_count_30m': np.random.poisson(10, n_samples),
-        'amount_avg_5m': np.random.lognormal(4, 1, n_samples),
-        'amount_sum_5m': np.random.lognormal(5, 1, n_samples),
-        'amount_max_5m': np.random.lognormal(5.5, 1.5, n_samples),
-        'amount_std_5m': np.random.exponential(50, n_samples),
-        'unique_countries_5m': np.random.choice([1, 2, 3], n_samples, p=[0.8, 0.15, 0.05]),
-        'geo_diversity_score': np.random.beta(2, 5, n_samples),
-        'time_since_last_txn_min': np.random.exponential(60, n_samples),
-        'is_weekend': np.random.choice([True, False], n_samples, p=[0.2, 0.8]),
-        'hour_of_day': np.random.randint(0, 24, n_samples),
-        'velocity_score': np.random.beta(2, 8, n_samples),
-        'high_risk_txn_ratio': np.random.beta(1, 9, n_samples),
-        'is_high_velocity': np.random.choice([True, False], n_samples, p=[0.1, 0.9]),
-        'is_geo_diverse': np.random.choice([True, False], n_samples, p=[0.05, 0.95]),
-        'has_high_risk_mcc': np.random.choice([True, False], n_samples, p=[0.15, 0.85])
-    }
-    
-    df = pd.DataFrame(data)
-    
-    # Generate fraud labels
-    fraud_prob = (
-        0.3 * df['velocity_score'] +
-        0.2 * df['geo_diversity_score'] + 
-        0.2 * df['high_risk_txn_ratio'] +
-        0.1 * df['is_high_velocity'].astype(float) +
-        0.1 * df['has_high_risk_mcc'].astype(float) +
-        0.1 * np.random.random(n_samples)
-    )
-    
-    # Set fraud threshold to achieve target rate
-    fraud_threshold = np.quantile(fraud_prob, 1 - fraud_rate)
-    is_fraud = fraud_prob >= fraud_threshold
-    
-    logger.info(f"Synthetic dataset created: fraud rate = {is_fraud.mean():.2%}")
-    
-    return df, pd.Series(is_fraud)
+
