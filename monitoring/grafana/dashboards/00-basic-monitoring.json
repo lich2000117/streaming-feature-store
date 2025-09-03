@@ -1,183 +1,354 @@
 {
   "annotations": {
-    "list": []
+  "list": \[]
   },
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
   "id": null,
-  "links": [],
+  "links": \[],
   "liveNow": false,
-  "panels": [
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Shows which services are up and running",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 10,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "vis": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 0
-      },
-      "id": 1,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom"
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "up",
-          "interval": "",
-          "legendFormat": "{{job}} ({{instance}})",
-          "refId": "A"
-        }
-      ],
-      "title": "Service Status (up=1 means running)",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "Shows all available metrics from Prometheus",
-      "fieldConfig": {
-        "defaults": {
-          "custom": {
-            "align": "auto",
-            "displayMode": "auto",
-            "inspect": false
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 24,
-        "x": 0,
-        "y": 8
-      },
-      "id": 2,
-      "options": {
-        "showHeader": true
-      },
-      "pluginVersion": "9.4.7",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "expr": "group by (__name__)({__name__=~\".+\"})",
-          "format": "table",
-          "instant": true,
-          "legendFormat": "",
-          "refId": "A"
-        }
-      ],
-      "title": "Available Metrics",
-      "transformations": [
-        {
-          "id": "organize",
-          "options": {
-            "excludeByName": {
-              "Time": true,
-              "Value": true
-            },
-            "indexByName": {},
-            "renameByName": {
-              "__name__": "Metric Name"
-            }
-          }
-        }
-      ],
-      "type": "table"
-    }
+  "panels": \[
+  {
+  "type": "stat",
+  "title": "Services Up",
+  "description": "Total number of targets currently reporting up=1",
+  "id": 10,
+  "gridPos": { "h": 5, "w": 6, "x": 0, "y": 0 },
+  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "options": {
+  "reduceOptions": { "calcs": \["lastNotNull"], "fields": "", "values": false },
+  "orientation": "horizontal",
+  "colorMode": "value",
+  "graphMode": "none",
+  "justifyMode": "center",
+  "textMode": "auto"
+  },
+  "fieldConfig": {
+  "defaults": {
+  "unit": "none",
+  "mappings": \[],
+  "thresholds": {
+  "mode": "absolute",
+  "steps": \[
+  { "color": "red", "value": null },
+  { "color": "orange", "value": 1 },
+  { "color": "green", "value": 2 }
+  ]
+  }
+  },
+  "overrides": \[]
+  },
+  "targets": \[
+  {
+  "refId": "A",
+  "expr": "sum(up)",
+  "legendFormat": ""
+  }
+  ]
+  },
+  {
+  "type": "stat",
+  "title": "Services Down",
+  "description": "Total number of targets currently down (up=0)",
+  "id": 11,
+  "gridPos": { "h": 5, "w": 6, "x": 6, "y": 0 },
+  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "options": {
+  "reduceOptions": { "calcs": \["lastNotNull"], "fields": "", "values": false },
+  "orientation": "horizontal",
+  "colorMode": "value",
+  "graphMode": "none",
+  "justifyMode": "center",
+  "textMode": "auto"
+  },
+  "fieldConfig": {
+  "defaults": {
+  "unit": "none",
+  "mappings": \[],
+  "thresholds": {
+  "mode": "absolute",
+  "steps": \[
+  { "color": "green", "value": null },
+  { "color": "orange", "value": 1 },
+  { "color": "red", "value": 2 }
+  ]
+  }
+  },
+  "overrides": \[]
+  },
+  "targets": \[
+  {
+  "refId": "A",
+  "expr": "sum(1 - up)",
+  "legendFormat": ""
+  }
+  ]
+  },
+  {
+  "type": "bargauge",
+  "title": "Uptime (last 5m) by Job",
+  "description": "Average of up over 5m window, by job",
+  "id": 12,
+  "gridPos": { "h": 5, "w": 12, "x": 12, "y": 0 },
+  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "options": {
+  "displayMode": "lcd",
+  "orientation": "horizontal",
+  "reduceOptions": { "calcs": \["lastNotNull"], "fields": "", "values": false },
+  "showUnfilled": false
+  },
+  "fieldConfig": {
+  "defaults": {
+  "unit": "percent",
+  "min": 0,
+  "max": 100,
+  "thresholds": {
+  "mode": "absolute",
+  "steps": \[
+  { "color": "red", "value": null },
+  { "color": "orange", "value": 90 },
+  { "color": "green", "value": 99 }
+  ]
+  }
+  },
+  "overrides": \[]
+  },
+  "targets": \[
+  {
+  "refId": "A",
+  "expr": "100 \* avg\_over\_time(up\[5m]) by (job)",
+  "legendFormat": "{{job}}"
+  }
+  ]
+  },
+  {
+  "type": "timeseries",
+  "title": "Service Status (up=1 means running)",
+  "description": "Per-instance service health over time",
+  "id": 1,
+  "gridPos": { "h": 8, "w": 24, "x": 0, "y": 5 },
+  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "options": {
+  "legend": { "calcs": \[], "displayMode": "table", "placement": "right" },
+  "tooltip": { "mode": "single", "sort": "none" }
+  },
+  "fieldConfig": {
+  "defaults": {
+  "color": { "mode": "palette-classic" },
+  "custom": {
+  "axisLabel": "",
+  "axisPlacement": "auto",
+  "barAlignment": 0,
+  "drawStyle": "line",
+  "fillOpacity": 20,
+  "gradientMode": "opacity",
+  "hideFrom": { "legend": false, "tooltip": false, "vis": false },
+  "lineInterpolation": "stepAfter",
+  "lineWidth": 2,
+  "pointSize": 2,
+  "scaleDistribution": { "type": "linear" },
+  "showPoints": "never",
+  "spanNulls": true,
+  "stacking": { "group": "A", "mode": "none" },
+  "thresholdsStyle": { "mode": "off" }
+  },
+  "mappings": \[
+  {
+  "type": "value",
+  "options": { "0": { "text": "Down" }, "1": { "text": "Up" } }
+  }
+  ],
+  "thresholds": {
+  "mode": "absolute",
+  "steps": \[
+  { "color": "red", "value": null },
+  { "color": "green", "value": 1 }
+  ]
+  }
+  },
+  "overrides": \[]
+  },
+  "targets": \[
+  {
+  "refId": "A",
+  "expr": "up",
+  "legendFormat": "{{job}} ({{instance}})"
+  }
+  ]
+  },
+  {
+  "type": "bargauge",
+  "title": "Scrape Duration (max over 5m) by Job (ms)",
+  "description": "Max scrape\_duration\_seconds observed per job in last 5 minutes",
+  "id": 13,
+  "gridPos": { "h": 8, "w": 12, "x": 0, "y": 13 },
+  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "options": {
+  "displayMode": "lcd",
+  "orientation": "horizontal",
+  "reduceOptions": { "calcs": \["lastNotNull"], "fields": "", "values": false },
+  "showUnfilled": false
+  },
+  "fieldConfig": {
+  "defaults": {
+  "unit": "ms",
+  "min": 0,
+  "thresholds": {
+  "mode": "absolute",
+  "steps": \[
+  { "color": "green", "value": null },
+  { "color": "orange", "value": 500 },
+  { "color": "red", "value": 1500 }
+  ]
+  }
+  },
+  "overrides": \[]
+  },
+  "targets": \[
+  {
+  "refId": "A",
+  "expr": "1000 \* max by (job) (max\_over\_time(scrape\_duration\_seconds\[5m]))",
+  "legendFormat": "{{job}}"
+  }
+  ]
+  },
+  {
+  "type": "bargauge",
+  "title": "Samples Scraped (max over 5m) by Job",
+  "description": "Maximum number of samples scraped over last 5 minutes",
+  "id": 14,
+  "gridPos": { "h": 8, "w": 12, "x": 12, "y": 13 },
+  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "options": {
+  "displayMode": "lcd",
+  "orientation": "horizontal",
+  "reduceOptions": { "calcs": \["lastNotNull"], "fields": "", "values": false },
+  "showUnfilled": false
+  },
+  "fieldConfig": {
+  "defaults": {
+  "unit": "short",
+  "min": 0,
+  "thresholds": {
+  "mode": "absolute",
+  "steps": \[
+  { "color": "red", "value": null },
+  { "color": "orange", "value": 5000 },
+  { "color": "green", "value": 20000 }
+  ]
+  }
+  },
+  "overrides": \[]
+  },
+  "targets": \[
+  {
+  "refId": "A",
+  "expr": "max by (job) (max\_over\_time(scrape\_samples\_scraped\[5m]))",
+  "legendFormat": "{{job}}"
+  }
+  ]
+  },
+  {
+  "type": "table",
+  "title": "Targets (Current)",
+  "description": "Snapshot of each target and its current up/down state",
+  "id": 15,
+  "gridPos": { "h": 8, "w": 24, "x": 0, "y": 21 },
+  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "pluginVersion": "9.4.7",
+  "options": { "showHeader": true },
+  "fieldConfig": {
+  "defaults": {
+  "custom": { "align": "auto", "displayMode": "auto", "inspect": false },
+  "mappings": \[
+  {
+  "type": "value",
+  "options": {
+  "0": { "text": "Down", "color": "red" },
+  "1": { "text": "Up", "color": "green" }
+  }
+  }
+  ],
+  "thresholds": {
+  "mode": "absolute",
+  "steps": \[ { "color": "red", "value": null }, { "color": "green", "value": 1 } ]
+  }
+  },
+  "overrides": \[]
+  },
+  "targets": \[
+  {
+  "refId": "A",
+  "expr": "up",
+  "format": "table",
+  "instant": true
+  }
+  ],
+  "transformations": \[
+  { "id": "labelsToFields", "options": {} },
+  {
+  "id": "organize",
+  "options": {
+  "excludeByName": { "Time": true },
+  "indexByName": {},
+  "renameByName": {
+  "Value": "Up",
+  "job": "Job",
+  "instance": "Instance"
+  },
+  "order": \["Job", "Instance", "Up"]
+  }
+  }
+  ]
+  },
+  {
+  "type": "table",
+  "title": "Available Metrics",
+  "description": "All unique metric names currently scraped",
+  "id": 2,
+  "gridPos": { "h": 8, "w": 24, "x": 0, "y": 29 },
+  "datasource": { "type": "prometheus", "uid": "prometheus" },
+  "pluginVersion": "9.4.7",
+  "options": { "showHeader": true },
+  "targets": \[
+  {
+  "refId": "A",
+  "expr": "group by (**name**)({**name**=\~".+"})",
+  "format": "table",
+  "instant": true
+  }
+  ],
+  "transformations": \[
+  {
+  "id": "organize",
+  "options": {
+  "excludeByName": { "Time": true, "Value": true },
+  "indexByName": {},
+  "renameByName": { "**name**": "Metric Name" }
+  }
+  }
+  ],
+  "fieldConfig": {
+  "defaults": {
+  "mappings": \[],
+  "thresholds": { "mode": "absolute", "steps": \[ { "color": "green", "value": null } ] }
+  },
+  "overrides": \[]
+  }
+  }
   ],
   "refresh": "10s",
   "schemaVersion": 37,
   "style": "dark",
-  "tags": ["monitoring", "basic"],
-  "templating": {
-    "list": []
-  },
-  "time": {
-    "from": "now-5m",
-    "to": "now"
-  },
+  "tags": \["monitoring", "basic"],
+  "templating": { "list": \[] },
+  "time": { "from": "now-5m", "to": "now" },
   "timepicker": {},
   "timezone": "",
   "title": "Basic Monitoring - Service Status",
   "uid": "basic-monitoring",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
-}
+  }
+  

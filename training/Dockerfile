@@ -22,5 +22,9 @@ RUN mkdir -p /app/models /app/artifacts
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
     CMD python -c "import sys; sys.exit(0)"
 
-# Default to training script
-CMD ["python", "train.py"]
+# Make scripts executable
+RUN chmod +x train.py scheduler.py
+
+# Default to training script, but allow override via command
+ENTRYPOINT ["python"]
+CMD ["train.py"]

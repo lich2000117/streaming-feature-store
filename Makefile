@@ -25,8 +25,12 @@ feast_up:      ## Start feature store server, and apply feature definitions
 	docker compose -f infra/docker-compose.yml --profile feast up -d --build
 	docker exec -it feast-server feast apply
 
-train:      ## Run ML training pipeline (with MLflow)
-	docker compose -f infra/docker-compose.yml up training-job -d --build
+train:      ## Run ML training pipeline (with MLflow), scheduled retrain at the same time
+	docker compose -f infra/docker-compose.yml up training-job --build
+
+train-scheduled:      ## Run ML training pipeline (with MLflow), scheduled retrain at the same time
+	docker compose -f infra/docker-compose.yml up training-scheduler -d --build
+
 
 monitor:    ## Start monitoring stack (prometheus, grafana)
 	docker compose -f infra/docker-compose.yml --profile monitoring up -d --build
@@ -51,6 +55,8 @@ logs-ml:   ## View mlflow logs
 logs-train:   ## View mlflow logs
 	docker compose -f infra/docker-compose.yml logs -f training-job
 
+logs-train-scheduled:   ## View mlflow logs
+	docker compose -f infra/docker-compose.yml logs -f training-scheduler
 
 logs-api:   ## View inference API logs
 	docker compose -f infra/docker-compose.yml logs -f inference-api
