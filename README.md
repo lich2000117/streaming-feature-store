@@ -10,7 +10,7 @@
 
 *Demonstrating Data Engineering, MLOps, and Infrastructure Engineering capabilities*
 
-![Real-Time Fraud Detection](docs/images/RealtimeFraudDetect.png)
+![Real-Time Fraud Detection](docs/images/RealTimeFraudDetect.png)
 
 ![Feature Store Architecture](docs/images/FeatureStoreIMG.png)
 
